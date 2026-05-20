@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
     <style>
         body { font-family: sans-serif; text-align: center; background-color: #f4f7f6; margin: 0; padding: 20px; }
-        .setup-box { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; }
+        .setup-box { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; min-width: 400px; }
         .main-container { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
         .video-box { position: relative; }
         video { display: none; }
@@ -21,6 +21,44 @@
         button { padding: 8px 15px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;}
         button:hover { background: #2980b9; }
         ul { text-align: left; margin: 10px 0 0 0; padding-left: 20px;}
+
+        /* 座席配置UI用 */
+        #seat-map {
+            width: 400px;
+            height: 320px;
+            background: #e0e0e0;
+            background-image: linear-gradient(#ccc 1px, transparent 1px), linear-gradient(90deg, #ccc 1px, transparent 1px);
+            background-size: 40px 40px;
+            position: relative;
+            margin: 20px auto;
+            border: 5px solid #bdc3c7;
+        }
+        .seat {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: move;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            user-select: none;
+        }
+        .seat.me { background: #3498db; cursor: default; }
+        .seat.other { background: #2ecc71; }
+        .seat-label {
+            position: absolute;
+            bottom: -20px;
+            width: 100px;
+            left: -30px;
+            color: #333;
+            text-align: center;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -28,8 +66,23 @@
     <h1>🤖 チームファシリテーター</h1>
 
     <div class="setup-box" id="setup-area">
-        自分の名前: <input type="text" id="my-name" value="Aさん">
-        <button onclick="startSystem()">カメラ・マイクを起動して設定へ</button>
+        <div style="margin-bottom: 15px;">
+            自分の名前: <input type="text" id="my-name" value="Aさん">
+        </div>
+        
+        <h3>🪑 座席配置を設定</h3>
+        <p style="font-size: 14px; color: #555;">グリッド内をクリックして参加者を追加し、ドラッグして位置を調整してください。<br>（下があなたの位置です）</p>
+        
+        <div id="seat-map">
+            <div class="seat me" id="seat-me" style="bottom: 0px; left: 160px;">
+                私
+                <div class="seat-label" id="my-name-label">Aさん</div>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <button onclick="startSystem()">この配置で開始する</button>
+        </div>
     </div>
 
     <div class="main-container" id="main-area" style="display: none;">
@@ -38,10 +91,7 @@
             <canvas id="output_canvas" width="640" height="480"></canvas>
             
             <div class="setup-box" style="margin-top: 15px; width: 90%; display: block;">
-                <h3>📍 参加者の位置を学習させる</h3>
-                <p style="font-size: 14px; color: #555;">画面上の相手がいる方向を向いて「今の向きを登録」を押してください。</p>
-                <input type="text" id="target-name" placeholder="例: Bさん">
-                <button onclick="registerTarget()" style="background: #2ecc71;">今の向きを登録</button>
+                <h3>📍 参加者の位置（設定済み）</h3>
                 <ul id="registered-list">
                     <li>正面 (デフォルト)</li>
                 </ul>
@@ -51,6 +101,7 @@
         <div class="dashboard">
             <h3>📊 あなたの状況</h3>
             <div class="status-item" id="my-direction">視線: 判定中...</div>
+            <div class="status-item" id="my-ratio" style="font-size: 12px; color: #888;">内部比率: -</div>
             <div class="status-item" id="my-audio">発言量: 判定中...</div>
             
             <div class="alert-text" id="look-alert"></div>
@@ -86,6 +137,116 @@
             { name: "正面", ratio: 0.5 }
         ];
 
+        // --- 座席配置UIの実装 (リファクタリング版) ---
+        const seatMap = document.getElementById('seat-map');
+        const myNameInput = document.getElementById('my-name');
+        const myNameLabel = document.getElementById('my-name-label');
+        const seatMe = document.getElementById('seat-me');
+        let otherSeats = [];
+        let draggingElement = null;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+
+        myNameInput.addEventListener('input', () => {
+            myNameLabel.innerText = myNameInput.value;
+        });
+
+        // 共通のドラッグ開始処理
+        function setupDraggable(el) {
+            el.addEventListener('mousedown', (e) => {
+                draggingElement = el;
+                const rect = el.getBoundingClientRect();
+                dragOffsetX = e.clientX - rect.left;
+                dragOffsetY = e.clientY - rect.top;
+                el.style.zIndex = 1000;
+                e.stopPropagation();
+            });
+        }
+
+        setupDraggable(seatMe);
+
+        window.addEventListener('mousemove', (e) => {
+            if (!draggingElement) return;
+            
+            const rect = seatMap.getBoundingClientRect();
+            let nx = e.clientX - rect.left - dragOffsetX;
+            let ny = e.clientY - rect.top - dragOffsetY;
+            
+            // 範囲制限
+            nx = Math.max(0, Math.min(rect.width - 40, nx));
+            ny = Math.max(0, Math.min(rect.height - 40, ny));
+
+            draggingElement.style.left = nx + 'px';
+            draggingElement.style.top = ny + 'px';
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (!draggingElement) return;
+            
+            // スナップ
+            let lx = parseInt(draggingElement.style.left);
+            let ly = parseInt(draggingElement.style.top);
+            draggingElement.style.left = Math.round(lx / 40) * 40 + 'px';
+            draggingElement.style.top = Math.round(ly / 40) * 40 + 'px';
+            
+            draggingElement.style.zIndex = "";
+            draggingElement = null;
+        });
+
+        seatMap.addEventListener('click', (e) => {
+            if (e.target !== seatMap) return;
+            
+            const name = prompt("参加者の名前を入力してください:");
+            if (!name) return;
+
+            const rect = seatMap.getBoundingClientRect();
+            addSeat(name, e.clientX - rect.left - 20, e.clientY - rect.top - 20);
+        });
+
+        function addSeat(name, x, y) {
+            const seat = document.createElement('div');
+            seat.className = 'seat other';
+            
+            // スナップさせて初期配置
+            const snapX = Math.round((x) / 40) * 40;
+            const snapY = Math.round((y) / 40) * 40;
+            
+            seat.style.left = snapX + 'px';
+            seat.style.top = snapY + 'px';
+            seat.innerText = name[0];
+            
+            const label = document.createElement('div');
+            label.className = 'seat-label';
+            label.innerText = name;
+            seat.appendChild(label);
+            
+            seatMap.appendChild(seat);
+            setupDraggable(seat);
+            otherSeats.push({ name, element: seat });
+        }
+
+        // 座標から角度比率(ratio)を計算
+        function calculateRatio(element) {
+            // "私" の位置を基準にする
+            const meX = parseFloat(seatMe.style.left) + 20;
+            const meY = parseFloat(seatMe.style.top) + 20;
+            const targetX = parseFloat(element.style.left) + 20;
+            const targetY = parseFloat(element.style.top) + 20;
+            
+            const dx = targetX - meX;
+            const dy = targetY - meY; // スクリーン座標なので下方向が正
+            
+            // 自分の正面を -Y 方向 (上) とする
+            // atan2(dx, -dy) で、正面が 0, 右が PI/2, 左が -PI/2
+            let angle = Math.atan2(dx, -dy);
+            
+            // ratio: 左(-PI/2) -> 0.0, 正面(0) -> 0.5, 右(PI/2) -> 1.0
+            // PI で割って 0.5 を足す
+            let ratio = (angle / Math.PI) + 0.5;
+            
+            return Math.max(0, Math.min(1, ratio));
+        }
+
         // UI要素
         const canvasElement = document.getElementById('output_canvas');
         const canvasCtx = canvasElement.getContext('2d');
@@ -102,28 +263,25 @@
             myName = document.getElementById('my-name').value;
             if(!myName) return alert("名前を入力してください");
             
+            // 座席配置を登録
+            registeredTargets = [{ name: "正面", ratio: 0.5 }];
+            registeredListEl.innerHTML = "<li>正面 (デフォルト)</li>";
+            
+            otherSeats.forEach(s => {
+                const ratio = calculateRatio(s.element);
+                registeredTargets.push({ name: s.name, ratio: ratio });
+                
+                const li = document.createElement('li');
+                li.innerText = `${s.name} (設定角度: ${ratio.toFixed(2)})`;
+                registeredListEl.appendChild(li);
+            });
+
             document.getElementById('setup-area').style.display = 'none';
             document.getElementById('main-area').style.display = 'flex';
 
             initWebSocket();
             await initAudio();
             initFaceMesh();
-        }
-
-        // --- 座席位置の登録（キャリブレーション） ---
-        function registerTarget() {
-            const tName = document.getElementById('target-name').value;
-            if(!tName) return alert("登録する人の名前を入力してください");
-
-            // 現在の顔の角度比率を保存
-            registeredTargets.push({ name: tName, ratio: currentFaceRatio });
-            
-            // UIを更新
-            const li = document.createElement('li');
-            li.innerText = `${tName} (角度: ${currentFaceRatio.toFixed(2)})`;
-            registeredListEl.appendChild(li);
-            
-            document.getElementById('target-name').value = ""; // リセット
         }
 
         // --- WebSocket (ネットワーク機能) ---
@@ -250,16 +408,28 @@
                     // 顔の左右のゆがみ（角度）を0〜1の比率で計算
                     const distToLeft = nose.x - leftEdge.x;
                     const distToRight = rightEdge.x - nose.x;
-                    currentFaceRatio = distToLeft / (distToLeft + distToRight);
                     
-                    // 登録されたターゲットの中で、現在の角度に一番近い人を探す
+                    // 生の比率 (0.5が正面)
+                    let rawRatio = distToLeft / (distToLeft + distToRight);
+                    
+                    // 感度調整 (4倍に強化)
+                    // rawRatio が 0.5 より大きければ右、小さければ左
+                    const sensitivity = 4.0;
+                    currentFaceRatio = 0.5 + (rawRatio - 0.5) * sensitivity;
+                    currentFaceRatio = Math.max(0, Math.min(1, currentFaceRatio));
+
+                    document.getElementById('my-ratio').innerText = `内部比率: ${currentFaceRatio.toFixed(2)} (生: ${rawRatio.toFixed(2)})`;
+                    
+                    // 登録されたターゲットの中で、一番近い人を探す
                     let closestTarget = "正面";
                     let minDiff = 1.0;
                     
                     registeredTargets.forEach(target => {
                         let diff = Math.abs(currentFaceRatio - target.ratio);
-                        // 誤差0.15以内なら「見ている」と判定
-                        if (diff < minDiff && diff < 0.15) {
+                        // 正面には少し強めのバイアス（0.15以内なら正面優先）
+                        if (target.name === "正面") diff *= 0.8; 
+
+                        if (diff < minDiff) {
                             minDiff = diff;
                             closestTarget = target.name;
                         }
