@@ -2,64 +2,29 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>AI Facilitator - UIスッキリ版</title>
+    <title>AI Facilitator - ルーム機能版</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
     <style>
         body { font-family: sans-serif; text-align: center; background-color: #f4f7f6; margin: 0; padding: 20px; }
-        .setup-box { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; min-width: 400px; }
+        .setup-box { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; min-width: 400px; text-align: left;}
         .main-container { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
         .video-box { position: fixed; top: 10px; right: 10px; z-index: 1000; width: 200px; height: 150px; }
         video { display: none; }
         canvas { border: 2px solid #333; border-radius: 8px; transform: scaleX(-1); width: 100%; height: auto; }
         .dashboard { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 400px; text-align: left; }
-        .alert-text { font-size: 16px; color: #e74c3c; font-weight: bold; min-height: 25px; margin-top: 10px; }
         .global-alert { font-size: 16px; color: #d35400; font-weight: bold; background: #fdebd0; padding: 10px; border-radius: 5px; margin-top: 10px; min-height: 20px;}
         .status-item { margin-bottom: 10px; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
-        input[type="text"] { padding: 8px; margin: 0 5px; border: 1px solid #ccc; border-radius: 4px;}
-        button { padding: 8px 15px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;}
-        .lonely-btn {
-            background: #e74c3c;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 300px;
-            height: 300px;
-            font-size: 40px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 15px #c0392b;
-            transition: all 0.1s;
-            margin: 40px auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            outline: none;
-            text-align: center;
-        }
-        .lonely-btn:hover {
-            background: #ff5e4d;
-        }
-        .lonely-btn:active {
-            background: #e74c3c;
-            box-shadow: 0 5px #c0392b;
-            transform: translateY(10px);
-        }
-        .lonely-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(231, 76, 60, 0.9);
-            color: white;
-            z-index: 9999;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            font-size: 48px;
-            font-weight: bold;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-        .role-selector { margin: 15px 0; padding: 10px; background: #ecf0f1; border-radius: 5px; text-align: left;}
+        input[type="text"] { padding: 8px; margin: 0 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px;}
+        button { padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; width: 100%;}
+        .mode-selector { margin: 15px 0; padding: 15px; background: #ecf0f1; border-radius: 5px;}
+        .room-code-display { font-size: 24px; font-weight: bold; color: #2c3e50; letter-spacing: 2px; background: #fff; padding: 5px 10px; border-radius: 5px; display: inline-block;}
+        
+        .lonely-btn { background: #e74c3c; color: white; border: none; border-radius: 50%; width: 300px; height: 300px; font-size: 40px; font-weight: bold; cursor: pointer; box-shadow: 0 15px #c0392b; transition: all 0.1s; margin: 40px auto; display: flex; align-items: center; justify-content: center; outline: none; }
+        .lonely-btn:hover { background: #ff5e4d; }
+        .lonely-btn:active { background: #e74c3c; box-shadow: 0 5px #c0392b; transform: translateY(10px); }
+        .lonely-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(231, 76, 60, 0.9); color: white; z-index: 9999; justify-content: center; align-items: center; flex-direction: column; font-size: 48px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        
         #seat-map { width: 400px; height: 320px; background: #e0e0e0; position: relative; margin: 20px auto; border: 5px solid #bdc3c7; }
         .seat { width: 40px; height: 40px; border-radius: 4px; position: absolute; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; cursor: move; user-select: none; }
         .seat.me { background: #3498db; cursor: default; }
@@ -72,31 +37,42 @@
     <div id="lonely-overlay" class="lonely-overlay">
         <div>📢 寂しいよ！</div>
         <div style="font-size: 24px; margin-top: 20px;">会話に入れていない人がいます</div>
-        <button onclick="hideLonelyOverlay()" style="margin-top: 30px; background: white; color: #e74c3c;">閉じる</button>
+        <button onclick="hideLonelyOverlay()" style="margin-top: 30px; background: white; color: #e74c3c; width: 200px;">閉じる</button>
     </div>
 
-    <h1>🤖 チームファシリテーター</h1>
+    <h1 style="text-align: center;">🤖 チームファシリテーター</h1>
 
-    <div class="setup-box" id="setup-area">
-        <div style="margin-bottom: 15px;">
-            自分の名前: <input type="text" id="my-name" value="Aさん">
-        </div>
+    <div style="text-align: center;">
+        <div class="setup-box" id="setup-area">
+            <div style="margin-bottom: 15px;">
+                <b>あなたの名前:</b> <input type="text" id="my-name" value="Aさん">
+            </div>
 
-        <div class="role-selector">
-            <b>あなたの役割:</b><br>
-            <label><input type="radio" name="role" value="parent" checked> 親機（全体の状況を分析し、指示を出す）</label><br>
-            <label><input type="radio" name="role" value="child"> 子機（自分のデータを送り、指示を受け取る）</label>
-        </div>
-        
-        <h3>🪑 座席配置（自分から見た相対位置）</h3>
-        <p style="font-size: 12px;">グリッド内をクリックして参加者を追加し、ドラッグで調整してください。<br>（下があなたの位置、上が「正面」です）</p>
-        
-        <div id="seat-map">
-            <div class="seat me" id="seat-me" style="bottom: 0px; left: 160px;">私<div class="seat-label" id="my-name-label">Aさん</div></div>
-        </div>
+            <div class="mode-selector">
+                <label><input type="radio" name="mode" value="host" checked onchange="toggleMode()"> <b>ルームを作る (親機)</b></label><br>
+                <label><input type="radio" name="mode" value="guest" onchange="toggleMode()"> <b>ルームに参加する (子機)</b></label>
+                
+                <div id="host-panel" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ccc;">
+                    あなたの招待コード: <br>
+                    <span class="room-code-display" id="generated-code"></span>
+                    <p style="font-size: 12px; color: #555;">※他の参加者にこのコードを教えてください</p>
+                </div>
 
-        <div style="margin-top: 20px;">
-            <button onclick="startSystem()">システム開始</button>
+                <div id="guest-panel" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ccc; display: none;">
+                    ホストから聞いた招待コードを入力:<br>
+                    <input type="text" id="join-code" placeholder="例: ABCD" style="text-transform: uppercase;">
+                </div>
+            </div>
+            
+            <h3>🪑 座席配置</h3>
+            <p style="font-size: 12px; text-align: center;">クリックして参加者を追加し、ドラッグで調整してください。</p>
+            <div id="seat-map">
+                <div class="seat me" id="seat-me" style="bottom: 0px; left: 160px;">私<div class="seat-label" id="my-name-label">Aさん</div></div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button onclick="startSystem()">システム開始</button>
+            </div>
         </div>
     </div>
 
@@ -104,7 +80,7 @@
         <div class="video-box">
             <video id="video" width="640" height="480" autoplay playsinline></video>
             <canvas id="output_canvas" width="640" height="480"></canvas>
-            <div id="role-badge" style="position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.7); color:white; padding:5px 10px; border-radius:5px; font-weight:bold;"></div>
+            <div id="role-badge" style="position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.7); color:white; padding:5px 10px; border-radius:5px; font-weight:bold; font-size:12px;"></div>
         </div>
 
         <div class="dashboard">
@@ -122,6 +98,7 @@
     <script>
         let myName = "";
         let myRole = "child";
+        let activeRoomCode = ""; // 参加しているルームのコード
         let ws;
         
         let isSpeaking = false;
@@ -131,6 +108,19 @@
         
         let registeredTargets = [{ name: "正面", ratio: 0.5 }];
         
+        // --- ルームコードの生成とUI切り替え ---
+        function generateRoomCode() {
+            // 4桁のランダムな英数字を生成 (例: X7A9)
+            return Math.random().toString(36).substring(2, 6).toUpperCase();
+        }
+        document.getElementById('generated-code').innerText = generateRoomCode();
+
+        function toggleMode() {
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            document.getElementById('host-panel').style.display = mode === 'host' ? 'block' : 'none';
+            document.getElementById('guest-panel').style.display = mode === 'guest' ? 'block' : 'none';
+        }
+
         // UI要素のセットアップ
         const seatMap = document.getElementById('seat-map');
         const myNameInput = document.getElementById('my-name');
@@ -162,10 +152,8 @@
             const rect = seatMap.getBoundingClientRect();
             let nx = e.clientX - rect.left - dragOffsetX;
             let ny = e.clientY - rect.top - dragOffsetY;
-            
             nx = Math.max(0, Math.min(rect.width - 40, nx));
             ny = Math.max(0, Math.min(rect.height - 40, ny));
-
             draggingElement.style.left = nx + 'px';
             draggingElement.style.top = ny + 'px';
         });
@@ -198,32 +186,38 @@
             otherSeats.push({ name, element: seat });
         });
 
-        // --- 座標から比率(ratio)を計算（ピクセル位置から確実に計算） ---
         function calculateRatio(element) {
             const meX = seatMe.offsetLeft + 20;
             const meY = seatMe.offsetTop + 20;
             const targetX = element.offsetLeft + 20;
             const targetY = element.offsetTop + 20;
-            
-            const dx = targetX - meX;
-            const dy = targetY - meY; 
-            
-            let angle = Math.atan2(dx, -dy);
+            let angle = Math.atan2(targetX - meX, -(targetY - meY));
             let ratio = 0.5 + (Math.sin(angle) * 0.5);
-            
             return Math.max(0, Math.min(1, ratio));
         }
 
         async function startSystem() {
             myName = document.getElementById('my-name').value;
-            myRole = document.querySelector('input[name="role"]:checked').value;
+            const mode = document.querySelector('input[name="mode"]:checked').value;
             
+            if (mode === 'host') {
+                myRole = 'parent';
+                activeRoomCode = document.getElementById('generated-code').innerText;
+            } else {
+                myRole = 'child';
+                activeRoomCode = document.getElementById('join-code').value.toUpperCase();
+                if (!activeRoomCode) {
+                    alert("招待コードを入力してください！");
+                    return;
+                }
+            }
+
             registeredTargets = [{ name: "正面", ratio: 0.5 }];
             otherSeats.forEach(s => registeredTargets.push({ name: s.name, ratio: calculateRatio(s.element) }));
 
             document.getElementById('setup-area').style.display = 'none';
             document.getElementById('main-area').style.display = 'flex';
-            document.getElementById('role-badge').innerText = myRole === 'parent' ? "👑 親機モード" : "👤 子機モード";
+            document.getElementById('role-badge').innerText = `ルーム: ${activeRoomCode} (${myRole === 'parent' ? '👑 ホスト' : '👤 ゲスト'})`;
 
             initWebSocket();
             await initAudio();
@@ -235,30 +229,35 @@
             const host = window.location.hostname || 'localhost';
             ws = new WebSocket(`ws://${host}:8080`);
             
+            ws.onopen = () => {
+                // 接続直後にルームへの参加を宣言する
+                ws.send(JSON.stringify({
+                    type: 'join_room',
+                    roomCode: activeRoomCode,
+                    name: myName
+                }));
+            };
+
             ws.onmessage = (event) => {
                 const msg = JSON.parse(event.data);
                 
                 if (msg.type === 'network_status') {
-                    // 親機のみが全体状況を分析して指示を出す
                     if (myRole === 'parent') {
                         analyzeGlobalStateAndCommand(msg.data);
                     }
                 } 
                 else if (msg.type === 'parent_command') {
-                    // 自分宛て、または全員宛てのメッセージを受信して表示
                     if (msg.target === myName || msg.target === 'all') {
                         document.getElementById('parent-command-alert').innerText = msg.message;
                     }
                 }
                 else if (msg.type === 'lonely_alert') {
-                    // 送信者以外に警告を表示
                     if (msg.from !== myName) {
                         showLonelyOverlay();
                     }
                 }
             };
 
-            // 自分の状況をサーバーに送り続ける
             setInterval(() => {
                 if(ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
@@ -279,26 +278,18 @@
             }
         }
 
-        function showLonelyOverlay() {
-            document.getElementById('lonely-overlay').style.display = 'flex';
-        }
+        function showLonelyOverlay() { document.getElementById('lonely-overlay').style.display = 'flex'; }
+        function hideLonelyOverlay() { document.getElementById('lonely-overlay').style.display = 'none'; }
 
-        function hideLonelyOverlay() {
-            document.getElementById('lonely-overlay').style.display = 'none';
-        }
-
-        // --- 親機のコア機能：全体を分析して指示を出す ---
+        // --- 親機の分析機能 ---
         function analyzeGlobalStateAndCommand(users) {
             if (users.length < 2) return;
-
-            // 1. 話しすぎの検知
-            let overSpeaker = users.find(u => u.speakDuration > 150); // 約5秒以上
+            let overSpeaker = users.find(u => u.speakDuration > 150); 
             if (overSpeaker) {
                 sendCommand(overSpeaker.name, "📢 少し話しすぎかもしれません。他の方に話を振ってみましょう。");
                 return; 
             }
 
-            // 2. 孤立の検知
             let isolatedUsers = [];
             users.forEach(u => {
                 let isLookedAt = users.some(other => other.name !== u.name && other.lookingAt === u.name);
@@ -321,110 +312,58 @@
 
         function sendCommand(targetName, message) {
             if(ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: 'parent_command',
-                    target: targetName,
-                    message: message
-                }));
+                ws.send(JSON.stringify({ type: 'parent_command', target: targetName, message: message }));
             }
         }
 
-        // --- マイク解析 ---
+        // --- マイク・カメラ解析 (以前と同じ) ---
         async function initAudio() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const analyser = audioContext.createAnalyser();
                 const microphone = audioContext.createMediaStreamSource(stream);
-                
-                analyser.fftSize = 256;
-                microphone.connect(analyser);
-                
+                analyser.fftSize = 256; microphone.connect(analyser);
                 const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
                 function checkVolume() {
                     analyser.getByteFrequencyData(dataArray);
-                    let sum = 0;
-                    for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+                    let sum = 0; for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
                     let average = sum / dataArray.length;
-
-                    if (average > 20) {
-                        isSpeaking = true;
-                        speakingTime++;
-                        document.getElementById('my-audio').innerText = "発言量: 🗣️ 発言中";
-                    } else {
-                        isSpeaking = false;
-                        speakingTime = 0;
-                        document.getElementById('my-audio').innerText = "発言量: ---";
-                    }
+                    if (average > 20) { isSpeaking = true; speakingTime++; document.getElementById('my-audio').innerText = "発言量: 🗣️ 発言中"; } 
+                    else { isSpeaking = false; speakingTime = 0; document.getElementById('my-audio').innerText = "発言量: ---"; }
                     requestAnimationFrame(checkVolume);
                 }
                 checkVolume();
-            } catch (err) {
-                console.error("マイクエラー", err);
-                document.getElementById('my-audio').innerText = "マイクエラー";
-            }
+            } catch (err) { console.error("マイクエラー", err); document.getElementById('my-audio').innerText = "マイクエラー"; }
         }
 
-        // --- 顔の向き解析 (MediaPipe Face Mesh) ---
         function initFaceMesh() {
             const videoElement = document.getElementById('video');
             const canvasElement = document.getElementById('output_canvas');
             const canvasCtx = canvasElement.getContext('2d');
             const faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
-            
             faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
-            
             faceMesh.onResults((results) => {
-                canvasCtx.save();
-                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                canvasCtx.save(); canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
                 if (results.image) canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-
                 if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
                     const landmarks = results.multiFaceLandmarks[0];
-                    
-                    // 顔の左右の端と鼻先を使用して判定
-                    const nose = landmarks[1];        
-                    const leftEdge = landmarks[234];  
-                    const rightEdge = landmarks[454]; 
-
-                    const distLeft = Math.abs(nose.x - leftEdge.x);
-                    const distRight = Math.abs(nose.x - rightEdge.x);
-
+                    const nose = landmarks[1], leftEdge = landmarks[234], rightEdge = landmarks[454]; 
+                    const distLeft = Math.abs(nose.x - leftEdge.x), distRight = Math.abs(nose.x - rightEdge.x);
                     let rawRatio = distLeft / (distLeft + distRight); 
-
                     const sensitivity = 2.5; 
-                    currentFaceRatio = 0.5 + (rawRatio - 0.5) * sensitivity;
-                    currentFaceRatio = Math.max(0, Math.min(1, currentFaceRatio)); 
-                    
+                    currentFaceRatio = Math.max(0, Math.min(1, 0.5 + (rawRatio - 0.5) * sensitivity)); 
                     let minDiff = 1.0;
                     registeredTargets.forEach(target => {
                         let diff = Math.abs(currentFaceRatio - target.ratio);
                         if (target.name === "正面") diff *= 0.85; 
-
-                        if (diff < minDiff) {
-                            minDiff = diff;
-                            currentLookTarget = target.name;
-                        }
+                        if (diff < minDiff) { minDiff = diff; currentLookTarget = target.name; }
                     });
-
-                    // デバッグ用の赤い点は残しています（不要なら削除可）
-                    canvasCtx.fillStyle = "red";
-                    [nose, leftEdge, rightEdge].forEach(pt => {
-                        canvasCtx.beginPath();
-                        canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, 4, 0, 2 * Math.PI);
-                        canvasCtx.fill();
-                    });
-
                     document.getElementById('my-direction').innerHTML = `視線: <b>${currentLookTarget}</b> を見ています`;
                 }
                 canvasCtx.restore();
             });
-
-            const camera = new Camera(videoElement, {
-                onFrame: async () => { await faceMesh.send({image: videoElement}); },
-                width: 640, height: 480
-            });
+            const camera = new Camera(videoElement, { onFrame: async () => { await faceMesh.send({image: videoElement}); }, width: 640, height: 480 });
             camera.start();
         }
     </script>
