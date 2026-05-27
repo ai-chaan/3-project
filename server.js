@@ -2,7 +2,7 @@
 const WebSocket = require('ws');
 const wss = new WebSocket.Server({ port: 8080 });
 
-// 接続している全ユーザーのステータスを保持
+// 最新のユーザー状態を保持
 let userStates = {};
 
 wss.on('connection', (ws) => {
@@ -12,16 +12,28 @@ wss.on('connection', (ws) => {
         try {
             const data = JSON.parse(message);
             
-            // ユーザーの状態を更新 (名前, 見ている方向, 発言中か, 話しすぎか等が含まれる)
-            userStates[data.name] = data;
-
-            // 全員に最新のネットワーク状況を送信
-            const networkStatus = Object.values(userStates);
-            wss.clients.forEach((client) => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(JSON.stringify(networkStatus));
-                }
-            });
+            if (data.type === 'state_update') {
+                // 子機（または親機自身）からの状態アップデート
+                userStates[data.name] = data.payload;
+                
+                // 全員に最新の全ユーザー状態を送信
+                wss.clients.forEach((client) => {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(JSON.stringify({
+                            type: 'network_status',
+                            data: Object.values(userStates)
+                        }));
+                    }
+                });
+            } 
+            else if (data.type === 'parent_command') {
+                // 親機から発行された「特定の人への指示」や「全体アラート」を全員に中継
+                wss.clients.forEach((client) => {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(JSON.stringify(data));
+                    }
+                });
+            }
         } catch (e) {
             console.error("データ解析エラー:", e);
         }

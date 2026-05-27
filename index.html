@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>AI Facilitator - フル機能版</title>
+    <title>AI Facilitator - 完全動作版</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
     <style>
@@ -17,71 +17,40 @@
         .global-alert { font-size: 16px; color: #d35400; font-weight: bold; background: #fdebd0; padding: 10px; border-radius: 5px; margin-top: 10px; min-height: 20px;}
         .status-item { margin-bottom: 10px; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         .network-box { margin-top: 20px; padding: 10px; background: #eef5ff; border-radius: 8px; font-size: 14px; }
-        input { padding: 8px; margin: 0 5px; border: 1px solid #ccc; border-radius: 4px;}
+        input[type="text"] { padding: 8px; margin: 0 5px; border: 1px solid #ccc; border-radius: 4px;}
         button { padding: 8px 15px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;}
-        button:hover { background: #2980b9; }
-        ul { text-align: left; margin: 10px 0 0 0; padding-left: 20px;}
-
-        /* 座席配置UI用 */
-        #seat-map {
-            width: 400px;
-            height: 320px;
-            background: #e0e0e0;
-            background-image: linear-gradient(#ccc 1px, transparent 1px), linear-gradient(90deg, #ccc 1px, transparent 1px);
-            background-size: 40px 40px;
-            position: relative;
-            margin: 20px auto;
-            border: 5px solid #bdc3c7;
-        }
-        .seat {
-            width: 40px;
-            height: 40px;
-            border-radius: 4px;
-            position: absolute;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 12px;
-            font-weight: bold;
-            cursor: move;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            user-select: none;
-        }
+        .role-selector { margin: 15px 0; padding: 10px; background: #ecf0f1; border-radius: 5px; text-align: left;}
+        #seat-map { width: 400px; height: 320px; background: #e0e0e0; position: relative; margin: 20px auto; border: 5px solid #bdc3c7; }
+        .seat { width: 40px; height: 40px; border-radius: 4px; position: absolute; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; cursor: move; user-select: none; }
         .seat.me { background: #3498db; cursor: default; }
         .seat.other { background: #2ecc71; }
-        .seat-label {
-            position: absolute;
-            bottom: -20px;
-            width: 100px;
-            left: -30px;
-            color: #333;
-            text-align: center;
-            white-space: nowrap;
-        }
+        .seat-label { position: absolute; bottom: -20px; width: 100px; left: -30px; color: #333; text-align: center; white-space: nowrap; }
     </style>
 </head>
 <body>
 
-    <h1>🤖 チームファシリテーター</h1>
+    <h1>🤖 チームファシリテーター (親機・子機モデル)</h1>
 
     <div class="setup-box" id="setup-area">
         <div style="margin-bottom: 15px;">
             自分の名前: <input type="text" id="my-name" value="Aさん">
         </div>
+
+        <div class="role-selector">
+            <b>あなたの役割:</b><br>
+            <label><input type="radio" name="role" value="parent" checked> 親機（全体の状況を分析し、指示を出す）</label><br>
+            <label><input type="radio" name="role" value="child"> 子機（自分のデータを送り、指示を受け取る）</label>
+        </div>
         
-        <h3>🪑 座席配置を設定</h3>
-        <p style="font-size: 14px; color: #555;">グリッド内をクリックして参加者を追加し、ドラッグして位置を調整してください。<br>（下があなたの位置です）</p>
+        <h3>🪑 座席配置（自分から見た相対位置）</h3>
+        <p style="font-size: 12px;">グリッド内をクリックして参加者を追加し、ドラッグで調整してください。<br>（下があなたの位置、上を「正面」とみなします）</p>
         
         <div id="seat-map">
-            <div class="seat me" id="seat-me" style="bottom: 0px; left: 160px;">
-                私
-                <div class="seat-label" id="my-name-label">Aさん</div>
-            </div>
+            <div class="seat me" id="seat-me" style="bottom: 0px; left: 160px;">私<div class="seat-label" id="my-name-label">Aさん</div></div>
         </div>
 
         <div style="margin-top: 20px;">
-            <button onclick="startSystem()">この配置で開始する</button>
+            <button onclick="startSystem()">システム開始</button>
         </div>
     </div>
 
@@ -89,26 +58,17 @@
         <div class="video-box">
             <video id="video" width="640" height="480" autoplay playsinline></video>
             <canvas id="output_canvas" width="640" height="480"></canvas>
-            
-            <div class="setup-box" style="margin-top: 15px; width: 90%; display: block;">
-                <h3>📍 参加者の位置（設定済み）</h3>
-                <ul id="registered-list">
-                    <li>正面 (デフォルト)</li>
-                </ul>
-            </div>
+            <div id="role-badge" style="position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.7); color:white; padding:5px 10px; border-radius:5px; font-weight:bold;"></div>
         </div>
 
         <div class="dashboard">
             <h3>📊 あなたの状況</h3>
             <div class="status-item" id="my-direction">視線: 判定中...</div>
-            <div class="status-item" id="my-ratio" style="font-size: 12px; color: #888;">内部比率: -</div>
+            <div class="status-item" id="my-ratio" style="font-size: 12px; color: #888;">認識比率: ---</div>
             <div class="status-item" id="my-audio">発言量: 判定中...</div>
             
-            <div class="alert-text" id="look-alert"></div>
-            
-            <h3>🌐 全体のアラート</h3>
-            <div class="global-alert" id="global-audio-alert"></div>
-            <div class="global-alert" id="network-alert"></div>
+            <h3>📩 親機からの指示</h3>
+            <div class="global-alert" id="parent-command-alert">待機中...</div>
 
             <h3>📡 全体のネットワーク</h3>
             <div class="network-box" id="network-view">サーバー接続待機中...</div>
@@ -116,42 +76,34 @@
     </div>
 
     <script>
-        // --- 設定変数 ---
         let myName = "";
+        let myRole = "child";
         let ws;
         
-        // 音声関連
+        // 音声・顔関連の変数
         let isSpeaking = false;
         let speakingTime = 0; 
-        let isOverSpeaking = false; // 自分自身の話しすぎフラグ
-        const SPEAKING_LIMIT = 150; // 話しすぎ警告の閾値 (約5秒連続)
-        
-        // 顔の向き関連
         let currentLookTarget = "正面";
-        let currentFaceRatio = 0.5; // 現在の顔の角度比率
-        let lookDuration = 0;
-        const LOOK_LIMIT = 80; // 見すぎ警告の閾値
+        let currentFaceRatio = 0.5; 
         
-        // 登録された座席配置 (初期値は正面のみ)
         let registeredTargets = [
             { name: "正面", ratio: 0.5 }
         ];
-
-        // --- 座席配置UIの実装 (リファクタリング版) ---
+        
+        // UI要素
         const seatMap = document.getElementById('seat-map');
         const myNameInput = document.getElementById('my-name');
         const myNameLabel = document.getElementById('my-name-label');
         const seatMe = document.getElementById('seat-me');
         let otherSeats = [];
+
+        myNameInput.addEventListener('input', () => myNameLabel.innerText = myNameInput.value);
+
+        // --- 座席配置UIのドラッグ＆ドロップ実装 ---
         let draggingElement = null;
         let dragOffsetX = 0;
         let dragOffsetY = 0;
 
-        myNameInput.addEventListener('input', () => {
-            myNameLabel.innerText = myNameInput.value;
-        });
-
-        // 共通のドラッグ開始処理
         function setupDraggable(el) {
             el.addEventListener('mousedown', (e) => {
                 draggingElement = el;
@@ -162,17 +114,14 @@
                 e.stopPropagation();
             });
         }
-
         setupDraggable(seatMe);
 
         window.addEventListener('mousemove', (e) => {
             if (!draggingElement) return;
-            
             const rect = seatMap.getBoundingClientRect();
             let nx = e.clientX - rect.left - dragOffsetX;
             let ny = e.clientY - rect.top - dragOffsetY;
             
-            // 範囲制限
             nx = Math.max(0, Math.min(rect.width - 40, nx));
             ny = Math.max(0, Math.min(rect.height - 40, ny));
 
@@ -182,37 +131,20 @@
 
         window.addEventListener('mouseup', () => {
             if (!draggingElement) return;
-            
-            // スナップ
-            let lx = parseInt(draggingElement.style.left);
-            let ly = parseInt(draggingElement.style.top);
-            draggingElement.style.left = Math.round(lx / 40) * 40 + 'px';
-            draggingElement.style.top = Math.round(ly / 40) * 40 + 'px';
-            
             draggingElement.style.zIndex = "";
             draggingElement = null;
         });
 
         seatMap.addEventListener('click', (e) => {
             if (e.target !== seatMap) return;
-            
             const name = prompt("参加者の名前を入力してください:");
             if (!name) return;
 
             const rect = seatMap.getBoundingClientRect();
-            addSeat(name, e.clientX - rect.left - 20, e.clientY - rect.top - 20);
-        });
-
-        function addSeat(name, x, y) {
             const seat = document.createElement('div');
             seat.className = 'seat other';
-            
-            // スナップさせて初期配置
-            const snapX = Math.round((x) / 40) * 40;
-            const snapY = Math.round((y) / 40) * 40;
-            
-            seat.style.left = snapX + 'px';
-            seat.style.top = snapY + 'px';
+            seat.style.left = (e.clientX - rect.left - 20) + 'px';
+            seat.style.top = (e.clientY - rect.top - 20) + 'px';
             seat.innerText = name[0];
             
             const label = document.createElement('div');
@@ -223,130 +155,123 @@
             seatMap.appendChild(seat);
             setupDraggable(seat);
             otherSeats.push({ name, element: seat });
-        }
+        });
 
-        // 座標から角度比率(ratio)を計算
-        function calculateRatio(element) {
-            // "私" の位置を基準にする
-            const meX = parseFloat(seatMe.style.left) + 20;
-            const meY = parseFloat(seatMe.style.top) + 20;
-            const targetX = parseFloat(element.style.left) + 20;
-            const targetY = parseFloat(element.style.top) + 20;
+        // --- 座標から比率(ratio)を計算 ---
+       function calculateRatio(element) {
+            // styleからではなく、ブラウザ上の実際のピクセル位置を確実に取得する
+            const meX = seatMe.offsetLeft + 20;
+            const meY = seatMe.offsetTop + 20;
+            const targetX = element.offsetLeft + 20;
+            const targetY = element.offsetTop + 20;
             
             const dx = targetX - meX;
-            const dy = targetY - meY; // スクリーン座標なので下方向が正
+            const dy = targetY - meY; 
             
-            // 自分の正面を -Y 方向 (上) とする
-            // atan2(dx, -dy) で、正面が 0, 右が PI/2, 左が -PI/2
+            // 角度を計算して比率（0.0〜1.0）に変換
             let angle = Math.atan2(dx, -dy);
-            
-            // ratio: 左(-PI/2) -> 0.0, 正面(0) -> 0.5, 右(PI/2) -> 1.0
-            // PI で割って 0.5 を足す
-            let ratio = (angle / Math.PI) + 0.5;
+            let ratio = 0.5 + (Math.sin(angle) * 0.5);
             
             return Math.max(0, Math.min(1, ratio));
         }
 
-        // UI要素
-        const canvasElement = document.getElementById('output_canvas');
-        const canvasCtx = canvasElement.getContext('2d');
-        const lookAlertEl = document.getElementById('look-alert');
-        const globalAudioAlertEl = document.getElementById('global-audio-alert');
-        const networkAlertEl = document.getElementById('network-alert');
-        const myDirectionEl = document.getElementById('my-direction');
-        const myAudioEl = document.getElementById('my-audio');
-        const networkViewEl = document.getElementById('network-view');
-        const registeredListEl = document.getElementById('registered-list');
-
-        // システム起動
         async function startSystem() {
             myName = document.getElementById('my-name').value;
-            if(!myName) return alert("名前を入力してください");
+            myRole = document.querySelector('input[name="role"]:checked').value;
             
-            // 座席配置を登録
             registeredTargets = [{ name: "正面", ratio: 0.5 }];
-            registeredListEl.innerHTML = "<li>正面 (デフォルト)</li>";
-            
-            otherSeats.forEach(s => {
-                const ratio = calculateRatio(s.element);
-                registeredTargets.push({ name: s.name, ratio: ratio });
-                
-                const li = document.createElement('li');
-                li.innerText = `${s.name} (設定角度: ${ratio.toFixed(2)})`;
-                registeredListEl.appendChild(li);
-            });
+            otherSeats.forEach(s => registeredTargets.push({ name: s.name, ratio: calculateRatio(s.element) }));
 
             document.getElementById('setup-area').style.display = 'none';
             document.getElementById('main-area').style.display = 'flex';
+            document.getElementById('role-badge').innerText = myRole === 'parent' ? "👑 親機モード" : "👤 子機モード";
 
             initWebSocket();
             await initAudio();
             initFaceMesh();
         }
 
-        // --- WebSocket (ネットワーク機能) ---
+        // --- WebSocket 通信 ---
         function initWebSocket() {
-            ws = new WebSocket('ws://localhost:8080');
-            
-            ws.onopen = () => { console.log("サーバー接続成功"); };
+            const host = window.location.hostname || 'localhost';
+            ws = new WebSocket(`ws://${host}:8080`);
             
             ws.onmessage = (event) => {
-                const networkData = JSON.parse(event.data);
-                updateNetworkView(networkData);
-                checkGlobalStatus(networkData);
+                const msg = JSON.parse(event.data);
+                
+                if (msg.type === 'network_status') {
+                    updateNetworkView(msg.data);
+                    if (myRole === 'parent') {
+                        analyzeGlobalStateAndCommand(msg.data);
+                    }
+                } 
+                else if (msg.type === 'parent_command') {
+                    if (msg.target === myName || msg.target === 'all') {
+                        document.getElementById('parent-command-alert').innerText = msg.message;
+                    }
+                }
             };
 
-            // 毎秒自分の状態をサーバーに送信 (overSpeakingも送信)
             setInterval(() => {
-                if(ws.readyState === WebSocket.OPEN) {
+                if(ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
+                        type: 'state_update',
                         name: myName,
-                        lookingAt: currentLookTarget,
-                        speaking: isSpeaking,
-                        overSpeaking: isOverSpeaking 
+                        payload: { name: myName, lookingAt: currentLookTarget, speaking: isSpeaking, speakDuration: speakingTime }
                     }));
                 }
             }, 500);
         }
 
-        // --- ネットワーク状態の描画と全体アラート ---
         function updateNetworkView(data) {
             let html = "";
             data.forEach(user => {
-                const talkIcon = user.speaking ? "🗣️(発言中)" : "静聴";
-                const overWarn = user.overSpeaking ? "⚠️" : "";
-                html += `<div><b>${user.name}</b> ${overWarn} → ${user.lookingAt} [${talkIcon}]</div>`;
+                html += `<div><b>${user.name}</b>: ${user.lookingAt}を見ている ${user.speaking ? "🗣️" : ""}</div>`;
             });
-            networkViewEl.innerHTML = html;
+            document.getElementById('network-view').innerHTML = html;
         }
 
-        function checkGlobalStatus(data) {
-            // 1. 全体への話しすぎアラート検知
-            let overSpeaker = data.find(u => u.overSpeaking);
+        // --- 親機のコア機能：全体を分析して指示を出す ---
+        function analyzeGlobalStateAndCommand(users) {
+            if (users.length < 2) return;
+
+            let overSpeaker = users.find(u => u.speakDuration > 150); // 約5秒以上
             if (overSpeaker) {
-                if (overSpeaker.name === myName) {
-                    globalAudioAlertEl.innerText = "📢 あなたが少し話しすぎかもしれません。周りの意見も聞いてみましょう。";
+                sendCommand(overSpeaker.name, "📢 話しすぎかもしれません。他の方に話を振ってみましょう。");
+                return; 
+            }
+
+            let isolatedUsers = [];
+            users.forEach(u => {
+                let isLookedAt = users.some(other => other.name !== u.name && other.lookingAt === u.name);
+                if (!isLookedAt && !u.speaking) {
+                    isolatedUsers.push(u.name);
+                }
+            });
+
+            if (isolatedUsers.length > 0) {
+                let currentSpeaker = users.find(u => u.speaking);
+                if (currentSpeaker) {
+                    sendCommand(currentSpeaker.name, `💡 ${isolatedUsers.join(', ')}さんが会話に入れていないようです。顔を向けてみましょう！`);
                 } else {
-                    globalAudioAlertEl.innerText = `📢 ${overSpeaker.name}さんの発言が続いています。相槌や質問を挟んでみましょう！`;
+                    sendCommand('all', `💡 ${isolatedUsers.join(', ')}さんに意見を聞いてみましょう！`);
                 }
             } else {
-                globalAudioAlertEl.innerText = "";
-            }
-
-            // 2. 孤立検知 (誰も自分を見ておらず、自分が発言もしていない)
-            let someoneLookingAtMe = false;
-            data.forEach(user => {
-                if (user.name !== myName && user.lookingAt === myName) someoneLookingAtMe = true;
-            });
-
-            if (!someoneLookingAtMe && !isSpeaking && data.length >= 3) {
-                networkAlertEl.innerText = "💡 会話に入りづらいですか？「ちなみに…」と手を挙げてみましょう。";
-            } else {
-                networkAlertEl.innerText = "";
+                sendCommand('all', "✨ 良いバランスで会話できています！");
             }
         }
 
-        // --- マイク解析 (話しすぎ判定) ---
+        function sendCommand(targetName, message) {
+            if(ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'parent_command',
+                    target: targetName,
+                    message: message
+                }));
+            }
+        }
+
+        // --- マイク解析 ---
         async function initAudio() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -365,90 +290,84 @@
                     for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
                     let average = sum / dataArray.length;
 
-                    if (average > 15) {
+                    if (average > 20) {
                         isSpeaking = true;
                         speakingTime++;
-                        myAudioEl.innerText = "発言量: 🗣️ 話しています";
+                        document.getElementById('my-audio').innerText = "発言量: 🗣️ 発言中";
                     } else {
                         isSpeaking = false;
                         speakingTime = 0;
-                        isOverSpeaking = false;
-                        myAudioEl.innerText = "発言量: 黙っています";
+                        document.getElementById('my-audio').innerText = "発言量: ---";
                     }
-
-                    // 話しすぎフラグのセット（これによってサーバー経由で全体に共有される）
-                    if (speakingTime > SPEAKING_LIMIT) {
-                        isOverSpeaking = true;
-                    }
-
                     requestAnimationFrame(checkVolume);
                 }
                 checkVolume();
             } catch (err) {
                 console.error("マイクのアクセスが拒否されました", err);
-                myAudioEl.innerText = "マイクエラー";
+                document.getElementById('my-audio').innerText = "マイクエラー";
             }
         }
 
-        // --- 顔の向き解析 (登録済みの角度との照合) ---
-        function initFaceMesh() {
+       function initFaceMesh() {
             const videoElement = document.getElementById('video');
+            const canvasElement = document.getElementById('output_canvas');
+            const canvasCtx = canvasElement.getContext('2d');
             const faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
             
-            faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+            faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
             
             faceMesh.onResults((results) => {
+                canvasCtx.save();
                 canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
                 if (results.image) canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
                 if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
                     const landmarks = results.multiFaceLandmarks[0];
-                    const nose = landmarks[1], leftEdge = landmarks[234], rightEdge = landmarks[454];
+                    
+                    // 【変更点】目ではなく「顔の左右の端(エッジ)」を使うことで、横顔を強力に検知する
+                    const nose = landmarks[1];        // 鼻先
+                    const leftEdge = landmarks[234];  // 顔の左端
+                    const rightEdge = landmarks[454]; // 顔の右端
 
-                    // 顔の左右のゆがみ（角度）を0〜1の比率で計算
-                    const distToLeft = nose.x - leftEdge.x;
-                    const distToRight = rightEdge.x - nose.x;
-                    
-                    // 生の比率 (0.5が正面)
-                    let rawRatio = distToLeft / (distToLeft + distToRight);
-                    
-                    // 感度調整 (4倍に強化)
-                    // rawRatio が 0.5 より大きければ右、小さければ左
-                    const sensitivity = 4.0;
+                    // 鼻先から左右の輪郭までの画面上での距離を計算
+                    const distLeft = Math.abs(nose.x - leftEdge.x);
+                    const distRight = Math.abs(nose.x - rightEdge.x);
+
+                    // 左右の距離の割合から、顔の向きを計算 (0.0: 左向き, 0.5: 正面, 1.0: 右向き)
+                    let rawRatio = distLeft / (distLeft + distRight); 
+
+                    // 感度調整: 首の振りを強調する（2.5倍に増幅）
+                    const sensitivity = 2.5; 
                     currentFaceRatio = 0.5 + (rawRatio - 0.5) * sensitivity;
-                    currentFaceRatio = Math.max(0, Math.min(1, currentFaceRatio));
+                    currentFaceRatio = Math.max(0, Math.min(1, currentFaceRatio)); // 0〜1の間に制限
 
-                    document.getElementById('my-ratio').innerText = `内部比率: ${currentFaceRatio.toFixed(2)} (生: ${rawRatio.toFixed(2)})`;
+                    document.getElementById('my-ratio').innerText = `認識比率: ${currentFaceRatio.toFixed(2)}`;
                     
-                    // 登録されたターゲットの中で、一番近い人を探す
-                    let closestTarget = "正面";
+                    // 最も近いターゲットを判定
                     let minDiff = 1.0;
-                    
                     registeredTargets.forEach(target => {
                         let diff = Math.abs(currentFaceRatio - target.ratio);
-                        // 正面には少し強めのバイアス（0.15以内なら正面優先）
-                        if (target.name === "正面") diff *= 0.8; 
+                        
+                        // 【変更点】正面判定の吸い付きを少し弱める（0.7 -> 0.85）ことで横を向きやすくする
+                        if (target.name === "正面") diff *= 0.85; 
 
                         if (diff < minDiff) {
                             minDiff = diff;
-                            closestTarget = target.name;
+                            currentLookTarget = target.name;
                         }
                     });
 
-                    myDirectionEl.innerText = `視線: ${closestTarget} を見ています`;
+                    // デバッグ用：AIがどこを見て判定しているか、顔の上に赤い点を表示
+                    canvasCtx.fillStyle = "red";
+                    [nose, leftEdge, rightEdge].forEach(pt => {
+                        canvasCtx.beginPath();
+                        canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, 4, 0, 2 * Math.PI);
+                        canvasCtx.fill();
+                    });
 
-                    // 見すぎアラート（自分のみ）
-                    if (closestTarget === currentLookTarget && closestTarget !== "正面") {
-                        lookDuration++;
-                        if (lookDuration > LOOK_LIMIT) {
-                            lookAlertEl.innerText = `⚠️ ${closestTarget}を見すぎです！別の人にも顔を向けましょう。`;
-                        }
-                    } else {
-                        currentLookTarget = closestTarget;
-                        lookDuration = 0;
-                        lookAlertEl.innerText = "";
-                    }
+                    document.getElementById('my-direction').innerHTML = `視線: <b>${currentLookTarget}</b> を見ています`;
                 }
+                canvasCtx.restore();
             });
 
             const camera = new Camera(videoElement, {
