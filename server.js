@@ -34,6 +34,14 @@ wss.on('connection', (ws) => {
                     }
                 });
             }
+            else if (data.type === 'lonely_alert') {
+                // 寂しいよアラートを全員に中継
+                wss.clients.forEach((client) => {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(JSON.stringify(data));
+                    }
+                });
+            }
         } catch (e) {
             console.error("データ解析エラー:", e);
         }
