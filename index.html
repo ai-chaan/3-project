@@ -371,16 +371,36 @@
                 if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
                     const landmarks = results.multiFaceLandmarks[0];
                     const nose = landmarks[1], leftEdge = landmarks[234], rightEdge = landmarks[454]; 
-                    const distLeft = Math.abs(nose.x - leftEdge.x), distRight = Math.abs(nose.x - rightEdge.x);
-                    let rawRatio = distLeft / (distLeft + distRight); 
-                    const sensitivity = 2.5; 
+                    
+                    // キャンバスは mirrored なので、x座標の計算を調整
+                    const distLeft = Math.abs(nose.x - leftEdge.x);
+                    const distRight = Math.abs(nose.x - rightEdge.x);
+                    
+                    // 鏡合わせの状態を考慮して比率を計算 (0:右端, 1:左端)
+                    let rawRatio = distRight / (distLeft + distRight); 
+                    
+                    const sensitivity = 2.0; 
                     currentFaceRatio = Math.max(0, Math.min(1, 0.5 + (rawRatio - 0.5) * sensitivity)); 
+                    
                     let minDiff = 1.0;
                     registeredTargets.forEach(target => {
                         let diff = Math.abs(currentFaceRatio - target.ratio);
-                        if (target.name === "正面") diff *= 0.85; 
-                        if (diff < minDiff) { minDiff = diff; currentLookTarget = target.name; }
+                        if (target.name === "正面") diff *= 0.8; // 正面への吸い付きを少し強める
+
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            currentLookTarget = target.name;
+                        }
                     });
+
+                    // 🔴 デバッグ用：AIが認識しているポイントを表示
+                    canvasCtx.fillStyle = "red";
+                    [nose, leftEdge, rightEdge].forEach(pt => {
+                        canvasCtx.beginPath();
+                        canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, 5, 0, 2 * Math.PI);
+                        canvasCtx.fill();
+                    });
+
                     document.getElementById('my-direction').innerHTML = `視線: <b>${currentLookTarget}</b> を見ています`;
                 }
                 canvasCtx.restore();
