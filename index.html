@@ -88,6 +88,8 @@
             <div class="status-item" id="my-direction">視線: 判定中...</div>
             <div class="status-item" id="my-audio" style="border-bottom: none;">発言量: 判定中...</div>
             
+            <div id="ws-status" style="font-size: 12px; margin-top: 10px; color: #7f8c8d;">接続状態: 待機中...</div>
+
             <h3>📩 AIからのアドバイス</h3>
             <div class="global-alert" id="parent-command-alert">AIが会話のバランスを分析中です...</div>
 
@@ -227,9 +229,16 @@
         // --- WebSocket 通信 ---
         function initWebSocket() {
             const host = window.location.hostname || 'localhost';
+            const wsStatus = document.getElementById('ws-status');
+            
+            console.log(`Connecting to WebSocket at ws://${host}:8080...`);
             ws = new WebSocket(`ws://${host}:8080`);
             
             ws.onopen = () => {
+                console.log("WebSocket connected!");
+                wsStatus.innerText = "接続状態: ✅ 接続済み";
+                wsStatus.style.color = "#2ecc71";
+
                 // 接続直後にルームへの参加を宣言する
                 ws.send(JSON.stringify({
                     type: 'join_room',
@@ -240,6 +249,7 @@
 
             ws.onmessage = (event) => {
                 const msg = JSON.parse(event.data);
+                console.log("Message received:", msg);
                 
                 if (msg.type === 'network_status') {
                     if (myRole === 'parent') {
@@ -256,6 +266,18 @@
                         showLonelyOverlay();
                     }
                 }
+            };
+
+            ws.onerror = (err) => {
+                console.error("WebSocket error:", err);
+                wsStatus.innerText = "接続状態: ❌ エラーが発生しました";
+                wsStatus.style.color = "#e74c3c";
+            };
+
+            ws.onclose = () => {
+                console.log("WebSocket closed.");
+                wsStatus.innerText = "接続状態: 🔌 切断されました";
+                wsStatus.style.color = "#7f8c8d";
             };
 
             setInterval(() => {
