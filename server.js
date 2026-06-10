@@ -34,6 +34,16 @@ wss.on('connection', (ws) => {
                         type: 'guest_joined',
                         name: data.name
                     }, 'host');
+                } else if (data.role === 'host') {
+                    // 親機が後から参加した場合、既にいる子機たちを親機に通知する
+                    rooms[roomCode].clients.forEach(client => {
+                        if (client.role === 'guest') {
+                            ws.send(JSON.stringify({
+                                type: 'guest_joined',
+                                name: client.userName
+                            }));
+                        }
+                    });
                 }
                 return;
             }
@@ -45,6 +55,7 @@ wss.on('connection', (ws) => {
 
             // WebRTC シグナリングの転送 (特定のターゲットへ)
             if (data.type === 'webrtc_offer' || data.type === 'webrtc_answer' || data.type === 'webrtc_ice_candidate') {
+                console.log(`Signaling: ${data.type} from ${data.from} to ${data.target}`);
                 broadcastToRoom(ws.roomCode, data, null, data.target);
                 return;
             }
