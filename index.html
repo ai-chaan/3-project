@@ -5,6 +5,7 @@
     <title>AI Facilitator - P2P完全修正版</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { font-family: sans-serif; text-align: center; background-color: #f4f7f6; margin: 0; padding: 20px; }
         .setup-box { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; min-width: 400px; text-align: left;}
@@ -161,7 +162,7 @@
             document.getElementById('setup-area').style.display = 'none'; document.getElementById('main-area').style.display = 'block';
             document.getElementById('role-badge').innerText = `ルーム: ${activeRoomCode} (${myRole === 'parent' ? '👑 ホスト' : '👤 ゲスト'})`;
             
-            initSignaling(); startDurationTimer(); await initAudio(); initFaceMesh();
+            initPeerJS(); startDurationTimer(); await initAudio(); initFaceMesh();
         }
 
         function startDurationTimer() {
@@ -173,92 +174,84 @@
         }
 
         // ==========================================
-        // ★ WebRTC (P2P) 関連の実装 ★
+        // ★ PeerJS (P2P) 関連の実装 ★
         // ==========================================
-        let ws; 
-        const iceServers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }; 
-        
-        let guestPeers = {}; 
-        let hostGlobalState = {}; 
-        let hostPeer = { pc: null, dc: null };
+        let peer;
+        let connections = {}; // ホスト用: { guestPeerId: conn }
+        let hostConn; // ゲスト用: ホストへの接続
 
-        function initSignaling() {
-            const host = window.location.hostname || 'localhost'; 
-            ws = new WebSocket(`ws://${host}:8080`);
-            
-            ws.onopen = () => {
-                const mode = document.querySelector('input[name="mode"]:checked').value;
-                ws.send(JSON.stringify({ type: 'join_room', roomCode: activeRoomCode, name: myName, role: mode === 'host' ? 'host' : 'guest' }));
-            };
+        function initPeerJS() {
+            // ルームコードをPeerIDとして使用（親機）または接続先として使用（子機）
+            const peerId = myRole === 'parent' ? `room-${activeRoomCode}` : null;
+            peer = new Peer(peerId, {
+                debug: 2
+            });
 
-            ws.onmessage = async (event) => {
-                const msg = JSON.parse(event.data);
-
-                if (myRole === 'parent' && msg.type === 'guest_joined') {
-                    initiateP2PConnection(msg.name);
+            peer.on('open', (id) => {
+                console.log('My peer ID is: ' + id);
+                if (myRole === 'child') {
+                    // ホストに接続
+                    const conn = peer.connect(`room-${activeRoomCode}`, {
+                        metadata: { name: myName }
+                    });
+                    setupConnection(conn);
                 }
-                
-                if (msg.type === 'webrtc_offer' && myRole === 'child') {
-                    handleOffer(msg);
-                } else if (msg.type === 'webrtc_answer' && myRole === 'parent') {
-                    await guestPeers[msg.from].pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
-                } else if (msg.type === 'webrtc_ice_candidate') {
-                    const pc = myRole === 'parent' ? guestPeers[msg.from].pc : hostPeer.pc;
-                    if (pc) await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-                }
-            };
+            });
 
+            peer.on('connection', (conn) => {
+                console.log('Incoming connection from: ' + conn.peer);
+                setupConnection(conn);
+            });
+
+            peer.on('error', (err) => {
+                console.error('PeerJS error:', err);
+                if (err.type === 'peer-unavailable') {
+                    alert('ルームが見つかりません。招待コードが正しいか、ホストが開始しているか確認してください。');
+                }
+            });
+
+            // 定期的な状態送信
             setInterval(() => {
-                const myPayload = { type: 'state_update', name: myName, payload: { name: myName, lookingAt: currentLookTarget, speaking: isSpeaking, speakDuration: speakDurationSeconds, lookDuration: lookDurationSeconds } };
-                
+                const myPayload = { 
+                    type: 'state_update', 
+                    name: myName, 
+                    payload: { 
+                        name: myName, 
+                        lookingAt: currentLookTarget, 
+                        speaking: isSpeaking, 
+                        speakDuration: speakDurationSeconds, 
+                        lookDuration: lookDurationSeconds 
+                    } 
+                };
+
                 if (myRole === 'parent') {
-                    handleP2PMessage(JSON.stringify(myPayload)); 
-                } else {
-                    if (hostPeer.dc && hostPeer.dc.readyState === 'open') {
-                        hostPeer.dc.send(JSON.stringify(myPayload)); 
-                    }
+                    // 自分自身の状態を分析に含める
+                    handleIncomingData(myPayload);
+                } else if (hostConn && hostConn.open) {
+                    hostConn.send(myPayload);
                 }
             }, 500);
         }
 
-        async function initiateP2PConnection(guestName) {
-            const pc = new RTCPeerConnection(iceServers);
-            const dc = pc.createDataChannel('facilitator-data'); 
-            
-            guestPeers[guestName] = { pc, dc };
-            dc.onmessage = (e) => handleP2PMessage(e.data); 
-            
-            pc.onicecandidate = (e) => {
-                if (e.candidate) ws.send(JSON.stringify({ type: 'webrtc_ice_candidate', target: guestName, candidate: e.candidate, from: myName }));
-            };
-
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            ws.send(JSON.stringify({ type: 'webrtc_offer', target: guestName, offer: offer, from: myName }));
+        function setupConnection(conn) {
+            if (myRole === 'parent') {
+                connections[conn.peer] = conn;
+                conn.on('data', (data) => handleIncomingData(data));
+                conn.on('open', () => {
+                    console.log('Connected to guest: ' + conn.metadata.name);
+                });
+            } else {
+                hostConn = conn;
+                conn.on('data', (data) => handleIncomingData(data));
+                conn.on('open', () => {
+                    console.log('Connected to host');
+                });
+            }
         }
 
-        async function handleOffer(msg) {
-            const pc = new RTCPeerConnection(iceServers);
-            hostPeer.pc = pc;
+        let hostGlobalState = {}; 
 
-            pc.ondatachannel = (e) => {
-                hostPeer.dc = e.channel;
-                hostPeer.dc.onmessage = (e) => handleP2PMessage(e.data); 
-            };
-
-            pc.onicecandidate = (e) => {
-                if (e.candidate) ws.send(JSON.stringify({ type: 'webrtc_ice_candidate', target: msg.from, candidate: e.candidate, from: myName }));
-            };
-
-            await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            ws.send(JSON.stringify({ type: 'webrtc_answer', target: msg.from, answer: answer, from: myName }));
-        }
-
-        function handleP2PMessage(dataString) {
-            const msg = JSON.parse(dataString);
-
+        function handleIncomingData(msg) {
             if (msg.type === 'state_update') {
                 if (myRole === 'parent') {
                     hostGlobalState[msg.name] = msg.payload;
@@ -273,7 +266,8 @@
             }
             else if (msg.type === 'lonely_alert') {
                 if (myRole === 'parent') {
-                    broadcastP2PMessage(msg);
+                    // ホストが受信したら全ゲストに転送（自分以外）
+                    broadcastToGuests(msg);
                     if (msg.from !== myName) showLonelyOverlay();
                 } else {
                     if (msg.from !== myName) showLonelyOverlay();
@@ -281,12 +275,11 @@
             }
         }
 
-        function broadcastP2PMessage(msgObj) {
+        function broadcastToGuests(msgObj) {
             if (myRole !== 'parent') return;
-            const msgString = JSON.stringify(msgObj);
-            Object.values(guestPeers).forEach(peer => {
-                if (peer.dc && peer.dc.readyState === 'open') {
-                    peer.dc.send(msgString);
+            Object.values(connections).forEach(conn => {
+                if (conn.open) {
+                    conn.send(msgObj);
                 }
             });
         }
@@ -294,10 +287,10 @@
         function sendLonelyAlert() { 
             const msg = { type: 'lonely_alert', from: myName };
             if (myRole === 'parent') {
-                handleP2PMessage(JSON.stringify(msg)); 
-                broadcastP2PMessage(msg); 
-            } else if (hostPeer.dc && hostPeer.dc.readyState === 'open') {
-                hostPeer.dc.send(JSON.stringify(msg)); 
+                handleIncomingData(msg); 
+                broadcastToGuests(msg); 
+            } else if (hostConn && hostConn.open) {
+                hostConn.send(msg); 
             }
         }
         function showLonelyOverlay() { document.getElementById('lonely-overlay').style.display = 'flex'; }
@@ -308,13 +301,15 @@
             let overSpeaker = users.find(u => u.speakDuration > 30); 
             if (overSpeaker) {
                 const cmd = { type: 'parent_command', target: overSpeaker.name, message: overSpeaker.name === myName ? "📢 あなたは30秒以上お話しされています。他の方に話を振ってみましょう！" : `📢 ${overSpeaker.name}さん、30秒以上お話しされています。そろそろ他の方に話を振ってみましょう！` };
-                handleP2PMessage(JSON.stringify(cmd)); broadcastP2PMessage(cmd);
+                handleIncomingData(cmd); 
+                broadcastToGuests(cmd);
                 return;
             }
             let overLooker = users.find(u => u.lookDuration >= 30);
             if (overLooker) { 
                 const cmd = { type: 'parent_command', target: overLooker.name, message: `⚠️ 警告：${overLooker.lookingAt}さんを30秒以上見続けています。別の人にも顔を向けてみましょう。` };
-                handleP2PMessage(JSON.stringify(cmd)); broadcastP2PMessage(cmd);
+                handleIncomingData(cmd); 
+                broadcastToGuests(cmd);
                 return; 
             }
 
@@ -326,10 +321,12 @@
             if (isolatedUsers.length > 0) {
                 let currentSpeaker = users.find(u => u.speaking);
                 const cmd = { type: 'parent_command', target: currentSpeaker ? currentSpeaker.name : 'all', message: currentSpeaker ? `💡 ${isolatedUsers.join(', ')}さんが会話に入れていないようです。顔を向けてみましょう！` : `💡 ${isolatedUsers.join(', ')}さんに意見を聞いてみましょう！` };
-                handleP2PMessage(JSON.stringify(cmd)); broadcastP2PMessage(cmd);
+                handleIncomingData(cmd); 
+                broadcastToGuests(cmd);
             } else { 
                 const cmd = { type: 'parent_command', target: 'all', message: "✨ 全員が参加できていて、良いバランスです！" };
-                handleP2PMessage(JSON.stringify(cmd)); broadcastP2PMessage(cmd);
+                handleIncomingData(cmd); 
+                broadcastToGuests(cmd);
             }
         }
 
