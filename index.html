@@ -268,16 +268,16 @@
         }
 
         let hostGlobalState = {}; 
-function handleIncomingData(msg) {
-    console.log("Received P2P Message:", msg);
-    if (msg.type === 'state_update') {
-        if (myRole === 'parent') {
-            hostGlobalState[msg.name] = { ...msg.payload, peerId: msg.peerId };
-            const users = Object.values(hostGlobalState);
-            analyzeGlobalStateAndCommand(users); 
-        }
-    } 
-...
+
+        function handleIncomingData(msg) {
+            console.log("Received P2P Message:", msg);
+            if (msg.type === 'state_update') {
+                if (myRole === 'parent') {
+                    hostGlobalState[msg.name] = { ...msg.payload, peerId: msg.peerId };
+                    const users = Object.values(hostGlobalState);
+                    analyzeGlobalStateAndCommand(users); 
+                }
+            } 
             else if (msg.type === 'parent_command') {
                 if (msg.target === myName || msg.target === 'all') {
                     document.getElementById('parent-command-alert').innerText = msg.message;
