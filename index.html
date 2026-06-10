@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>AI Facilitator - ルーム機能版</title>
+    <title>AI Facilitator - P2P完全修正版</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
     <style>
@@ -12,19 +12,16 @@
         .video-box { position: fixed; top: 10px; right: 10px; z-index: 1000; width: 200px; height: 150px; }
         video { display: none; }
         canvas { border: 2px solid #333; border-radius: 8px; transform: scaleX(-1); width: 100%; height: auto; }
-        .dashboard { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 400px; text-align: left; }
-        .global-alert { font-size: 16px; color: #d35400; font-weight: bold; background: #fdebd0; padding: 10px; border-radius: 5px; margin-top: 10px; min-height: 20px;}
+        .dashboard { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 400px; text-align: left; margin: 0 auto;}
+        .global-alert { font-size: 16px; color: #e74c3c; font-weight: bold; background: #fdebd0; padding: 15px; border-radius: 5px; margin-top: 10px; min-height: 40px; border-left: 5px solid #e74c3c;}
         .status-item { margin-bottom: 10px; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
         input[type="text"] { padding: 8px; margin: 0 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px;}
         button { padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; width: 100%;}
         .mode-selector { margin: 15px 0; padding: 15px; background: #ecf0f1; border-radius: 5px;}
         .room-code-display { font-size: 24px; font-weight: bold; color: #2c3e50; letter-spacing: 2px; background: #fff; padding: 5px 10px; border-radius: 5px; display: inline-block;}
-        
-        .lonely-btn { background: #e74c3c; color: white; border: none; border-radius: 50%; width: 300px; height: 300px; font-size: 40px; font-weight: bold; cursor: pointer; box-shadow: 0 15px #c0392b; transition: all 0.1s; margin: 40px auto; display: flex; align-items: center; justify-content: center; outline: none; }
-        .lonely-btn:hover { background: #ff5e4d; }
-        .lonely-btn:active { background: #e74c3c; box-shadow: 0 5px #c0392b; transform: translateY(10px); }
-        .lonely-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(231, 76, 60, 0.9); color: white; z-index: 9999; justify-content: center; align-items: center; flex-direction: column; font-size: 48px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-        
+        .lonely-btn { background: #e74c3c; color: white; border: none; border-radius: 50%; width: 260px; height: 260px; font-size: 32px; font-weight: bold; cursor: pointer; box-shadow: 0 12px #c0392b; transition: all 0.1s; margin: 30px auto; display: block; outline: none; }
+        .lonely-btn:active { box-shadow: 0 4px #c0392b; transform: translateY(8px); }
+        .lonely-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(231, 76, 60, 0.9); color: white; z-index: 9999; justify-content: center; align-items: center; flex-direction: column; font-size: 48px; font-weight: bold; }
         #seat-map { width: 400px; height: 320px; background: #e0e0e0; position: relative; margin: 20px auto; border: 5px solid #bdc3c7; }
         .seat { width: 40px; height: 40px; border-radius: 4px; position: absolute; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; cursor: move; user-select: none; }
         .seat.me { background: #3498db; cursor: default; }
@@ -40,7 +37,7 @@
         <button onclick="hideLonelyOverlay()" style="margin-top: 30px; background: white; color: #e74c3c; width: 200px;">閉じる</button>
     </div>
 
-    <h1 style="text-align: center;">🤖 チームファシリテーター</h1>
+    <h1 style="text-align: center;">🤖 チームファシリテーター (P2P通信)</h1>
 
     <div style="text-align: center;">
         <div class="setup-box" id="setup-area">
@@ -55,7 +52,6 @@
                 <div id="host-panel" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ccc;">
                     あなたの招待コード: <br>
                     <span class="room-code-display" id="generated-code"></span>
-                    <p style="font-size: 12px; color: #555;">※他の参加者にこのコードを教えてください</p>
                 </div>
 
                 <div id="guest-panel" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ccc; display: none;">
@@ -65,14 +61,11 @@
             </div>
             
             <h3>🪑 座席配置</h3>
-            <p style="font-size: 12px; text-align: center;">クリックして参加者を追加し、ドラッグで調整してください。</p>
+            <p style="font-size: 12px; color:#666;">グリッド内をクリックして参加者を追加し、ドラッグで位置を調整してください。</p>
             <div id="seat-map">
                 <div class="seat me" id="seat-me" style="bottom: 0px; left: 160px;">私<div class="seat-label" id="my-name-label">Aさん</div></div>
             </div>
-
-            <div style="margin-top: 20px;">
-                <button onclick="startSystem()">システム開始</button>
-            </div>
+            <button onclick="startSystem()">システム開始</button>
         </div>
     </div>
 
@@ -88,8 +81,6 @@
             <div class="status-item" id="my-direction">視線: 判定中...</div>
             <div class="status-item" id="my-audio" style="border-bottom: none;">発言量: 判定中...</div>
             
-            <div id="ws-status" style="font-size: 12px; margin-top: 10px; color: #7f8c8d;">接続状態: 待機中...</div>
-
             <h3>📩 AIからのアドバイス</h3>
             <div class="global-alert" id="parent-command-alert">AIが会話のバランスを分析中です...</div>
 
@@ -98,295 +89,291 @@
     </div>
 
     <script>
-        let myName = "";
-        let myRole = "child";
-        let activeRoomCode = ""; // 参加しているルームのコード
-        let ws;
-        
-        let isSpeaking = false;
-        let speakingTime = 0; 
-        let currentLookTarget = "正面";
-        let currentFaceRatio = 0.5; 
-        
+        let myName = "", myRole = "child", activeRoomCode = "";
+        let isSpeaking = false, currentLookTarget = "正面", currentFaceRatio = 0.5;
+        let speakDurationSeconds = 0, lookDurationSeconds = 0, lastLookTarget = "正面";
         let registeredTargets = [{ name: "正面", ratio: 0.5 }];
         
-        // --- ルームコードの生成とUI切り替え ---
-        function generateRoomCode() {
-            // 4桁のランダムな英数字を生成 (例: X7A9)
-            return Math.random().toString(36).substring(2, 6).toUpperCase();
-        }
-        document.getElementById('generated-code').innerText = generateRoomCode();
+        const seatMap = document.getElementById('seat-map'); 
+        const myNameInput = document.getElementById('my-name');
+        const myNameLabel = document.getElementById('my-name-label'); 
+        const seatMe = document.getElementById('seat-me');
+        let otherSeats = [];
 
+        function generateRoomCode() { return Math.random().toString(36).substring(2, 6).toUpperCase(); }
+        document.getElementById('generated-code').innerText = generateRoomCode();
+        
         function toggleMode() {
             const mode = document.querySelector('input[name="mode"]:checked').value;
             document.getElementById('host-panel').style.display = mode === 'host' ? 'block' : 'none';
             document.getElementById('guest-panel').style.display = mode === 'guest' ? 'block' : 'none';
         }
 
-        // UI要素のセットアップ
-        const seatMap = document.getElementById('seat-map');
-        const myNameInput = document.getElementById('my-name');
-        const myNameLabel = document.getElementById('my-name-label');
-        const seatMe = document.getElementById('seat-me');
-        let otherSeats = [];
-
-        myNameInput.addEventListener('input', () => myNameLabel.innerText = myNameInput.value);
-
-        // --- 座席配置UIのドラッグ＆ドロップ実装 ---
-        let draggingElement = null;
-        let dragOffsetX = 0;
-        let dragOffsetY = 0;
-
+        // --- 座席配置ドラッグ実装 ---
+        let draggingElement = null; let dragOffsetX = 0; let dragOffsetY = 0;
         function setupDraggable(el) {
             el.addEventListener('mousedown', (e) => {
-                draggingElement = el;
-                const rect = el.getBoundingClientRect();
-                dragOffsetX = e.clientX - rect.left;
-                dragOffsetY = e.clientY - rect.top;
-                el.style.zIndex = 1000;
-                e.stopPropagation();
+                draggingElement = el; const rect = el.getBoundingClientRect();
+                dragOffsetX = e.clientX - rect.left; dragOffsetY = e.clientY - rect.top;
+                el.style.zIndex = 1000; e.stopPropagation();
             });
         }
         setupDraggable(seatMe);
-
+        
         window.addEventListener('mousemove', (e) => {
-            if (!draggingElement) return;
-            const rect = seatMap.getBoundingClientRect();
-            let nx = e.clientX - rect.left - dragOffsetX;
-            let ny = e.clientY - rect.top - dragOffsetY;
-            nx = Math.max(0, Math.min(rect.width - 40, nx));
-            ny = Math.max(0, Math.min(rect.height - 40, ny));
-            draggingElement.style.left = nx + 'px';
-            draggingElement.style.top = ny + 'px';
+            if (!draggingElement) return; const rect = seatMap.getBoundingClientRect();
+            let nx = e.clientX - rect.left - dragOffsetX; let ny = e.clientY - rect.top - dragOffsetY;
+            nx = Math.max(0, Math.min(rect.width - 40, nx)); ny = Math.max(0, Math.min(rect.height - 40, ny));
+            draggingElement.style.left = nx + 'px'; draggingElement.style.top = ny + 'px';
         });
-
-        window.addEventListener('mouseup', () => {
-            if (!draggingElement) return;
-            draggingElement.style.zIndex = "";
-            draggingElement = null;
-        });
+        window.addEventListener('mouseup', () => { if (draggingElement) { draggingElement.style.zIndex = ""; draggingElement = null; } });
 
         seatMap.addEventListener('click', (e) => {
-            if (e.target !== seatMap) return;
-            const name = prompt("参加者の名前を入力してください:");
-            if (!name) return;
-
-            const rect = seatMap.getBoundingClientRect();
-            const seat = document.createElement('div');
-            seat.className = 'seat other';
-            seat.style.left = (e.clientX - rect.left - 20) + 'px';
-            seat.style.top = (e.clientY - rect.top - 20) + 'px';
-            seat.innerText = name[0];
-            
-            const label = document.createElement('div');
-            label.className = 'seat-label';
-            label.innerText = name;
-            seat.appendChild(label);
-            
-            seatMap.appendChild(seat);
-            setupDraggable(seat);
-            otherSeats.push({ name, element: seat });
+            if (e.target !== seatMap) return; const name = prompt("参加者の名前を入力してください:"); if (!name) return;
+            const rect = seatMap.getBoundingClientRect(); const seat = document.createElement('div');
+            seat.className = 'seat other'; seat.style.left = (e.clientX - rect.left - 20) + 'px'; seat.style.top = (e.clientY - rect.top - 20) + 'px';
+            seat.innerText = name[0]; const label = document.createElement('div'); label.className = 'seat-label'; label.innerText = name;
+            seat.appendChild(label); seatMap.appendChild(seat); setupDraggable(seat); otherSeats.push({ name, element: seat });
         });
 
         function calculateRatio(element) {
-            const meX = seatMe.offsetLeft + 20;
-            const meY = seatMe.offsetTop + 20;
-            const targetX = element.offsetLeft + 20;
-            const targetY = element.offsetTop + 20;
+            const meX = seatMe.offsetLeft + 20; const meY = seatMe.offsetTop + 20;
+            const targetX = element.offsetLeft + 20; const targetY = element.offsetTop + 20;
             let angle = Math.atan2(targetX - meX, -(targetY - meY));
-            let ratio = 0.5 + (Math.sin(angle) * 0.5);
+            let ratio = 0.5 + (Math.sin(angle) * 0.5); 
             return Math.max(0, Math.min(1, ratio));
         }
 
         async function startSystem() {
-            myName = document.getElementById('my-name').value;
+            myName = myNameInput.value; 
             const mode = document.querySelector('input[name="mode"]:checked').value;
             
-            if (mode === 'host') {
-                myRole = 'parent';
-                activeRoomCode = document.getElementById('generated-code').innerText;
-            } else {
-                myRole = 'child';
-                activeRoomCode = document.getElementById('join-code').value.toUpperCase();
-                if (!activeRoomCode) {
-                    alert("招待コードを入力してください！");
-                    return;
-                }
+            if (mode === 'host') { 
+                myRole = 'parent'; 
+                activeRoomCode = document.getElementById('generated-code').innerText; 
+            } else { 
+                activeRoomCode = document.getElementById('join-code').value.toUpperCase(); 
+                myRole = 'child'; 
+                if (!activeRoomCode) return alert("招待コードを入力してください"); 
             }
-
-            registeredTargets = [{ name: "正面", ratio: 0.5 }];
+            
             otherSeats.forEach(s => registeredTargets.push({ name: s.name, ratio: calculateRatio(s.element) }));
-
-            document.getElementById('setup-area').style.display = 'none';
-            document.getElementById('main-area').style.display = 'flex';
+            document.getElementById('setup-area').style.display = 'none'; document.getElementById('main-area').style.display = 'block';
             document.getElementById('role-badge').innerText = `ルーム: ${activeRoomCode} (${myRole === 'parent' ? '👑 ホスト' : '👤 ゲスト'})`;
-
-            initWebSocket();
-            await initAudio();
-            initFaceMesh();
+            
+            initSignaling(); startDurationTimer(); await initAudio(); initFaceMesh();
         }
 
-        // --- WebSocket 通信 ---
-        function initWebSocket() {
-            const host = window.location.hostname || 'localhost';
-            const wsStatus = document.getElementById('ws-status');
-            
-            console.log(`Connecting to WebSocket at ws://${host}:8080...`);
+        function startDurationTimer() {
+            setInterval(() => {
+                if (isSpeaking) speakDurationSeconds++; else speakDurationSeconds = 0;
+                if (currentLookTarget !== "正面" && currentLookTarget === lastLookTarget) lookDurationSeconds++; else lookDurationSeconds = 0;
+                lastLookTarget = currentLookTarget;
+            }, 1000);
+        }
+
+        // ==========================================
+        // ★ WebRTC (P2P) 関連の実装 ★
+        // ==========================================
+        let ws; 
+        const iceServers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }; 
+        
+        let guestPeers = {}; 
+        let hostGlobalState = {}; 
+        let hostPeer = { pc: null, dc: null };
+
+        function initSignaling() {
+            const host = window.location.hostname || 'localhost'; 
             ws = new WebSocket(`ws://${host}:8080`);
             
             ws.onopen = () => {
-                console.log("WebSocket connected!");
-                wsStatus.innerText = "接続状態: ✅ 接続済み";
-                wsStatus.style.color = "#2ecc71";
-
-                // 接続直後にルームへの参加を宣言する
-                ws.send(JSON.stringify({
-                    type: 'join_room',
-                    roomCode: activeRoomCode,
-                    name: myName
-                }));
+                const mode = document.querySelector('input[name="mode"]:checked').value;
+                ws.send(JSON.stringify({ type: 'join_room', roomCode: activeRoomCode, name: myName, role: mode === 'host' ? 'host' : 'guest' }));
             };
 
-            ws.onmessage = (event) => {
+            ws.onmessage = async (event) => {
                 const msg = JSON.parse(event.data);
-                console.log("Message received:", msg);
+
+                if (myRole === 'parent' && msg.type === 'guest_joined') {
+                    initiateP2PConnection(msg.name);
+                }
                 
-                if (msg.type === 'network_status') {
-                    if (myRole === 'parent') {
-                        analyzeGlobalStateAndCommand(msg.data);
-                    }
-                } 
-                else if (msg.type === 'parent_command') {
-                    if (msg.target === myName || msg.target === 'all') {
-                        document.getElementById('parent-command-alert').innerText = msg.message;
-                    }
+                if (msg.type === 'webrtc_offer' && myRole === 'child') {
+                    handleOffer(msg);
+                } else if (msg.type === 'webrtc_answer' && myRole === 'parent') {
+                    await guestPeers[msg.from].pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
+                } else if (msg.type === 'webrtc_ice_candidate') {
+                    const pc = myRole === 'parent' ? guestPeers[msg.from].pc : hostPeer.pc;
+                    if (pc) await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
                 }
-                else if (msg.type === 'lonely_alert') {
-                    if (msg.from !== myName) {
-                        showLonelyOverlay();
-                    }
-                }
-            };
-
-            ws.onerror = (err) => {
-                console.error("WebSocket error:", err);
-                wsStatus.innerText = "接続状態: ❌ エラーが発生しました";
-                wsStatus.style.color = "#e74c3c";
-            };
-
-            ws.onclose = () => {
-                console.log("WebSocket closed.");
-                wsStatus.innerText = "接続状態: 🔌 切断されました";
-                wsStatus.style.color = "#7f8c8d";
             };
 
             setInterval(() => {
-                if(ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: 'state_update',
-                        name: myName,
-                        payload: { name: myName, lookingAt: currentLookTarget, speaking: isSpeaking, speakDuration: speakingTime }
-                    }));
+                const myPayload = { type: 'state_update', name: myName, payload: { name: myName, lookingAt: currentLookTarget, speaking: isSpeaking, speakDuration: speakDurationSeconds, lookDuration: lookDurationSeconds } };
+                
+                if (myRole === 'parent') {
+                    handleP2PMessage(JSON.stringify(myPayload)); 
+                } else {
+                    if (hostPeer.dc && hostPeer.dc.readyState === 'open') {
+                        hostPeer.dc.send(JSON.stringify(myPayload)); 
+                    }
                 }
             }, 500);
         }
 
-        function sendLonelyAlert() {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: 'lonely_alert',
-                    from: myName
-                }));
+        async function initiateP2PConnection(guestName) {
+            const pc = new RTCPeerConnection(iceServers);
+            const dc = pc.createDataChannel('facilitator-data'); 
+            
+            guestPeers[guestName] = { pc, dc };
+            dc.onmessage = (e) => handleP2PMessage(e.data); 
+            
+            pc.onicecandidate = (e) => {
+                if (e.candidate) ws.send(JSON.stringify({ type: 'webrtc_ice_candidate', target: guestName, candidate: e.candidate, from: myName }));
+            };
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            ws.send(JSON.stringify({ type: 'webrtc_offer', target: guestName, offer: offer, from: myName }));
+        }
+
+        async function handleOffer(msg) {
+            const pc = new RTCPeerConnection(iceServers);
+            hostPeer.pc = pc;
+
+            pc.ondatachannel = (e) => {
+                hostPeer.dc = e.channel;
+                hostPeer.dc.onmessage = (e) => handleP2PMessage(e.data); 
+            };
+
+            pc.onicecandidate = (e) => {
+                if (e.candidate) ws.send(JSON.stringify({ type: 'webrtc_ice_candidate', target: msg.from, candidate: e.candidate, from: myName }));
+            };
+
+            await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            ws.send(JSON.stringify({ type: 'webrtc_answer', target: msg.from, answer: answer, from: myName }));
+        }
+
+        function handleP2PMessage(dataString) {
+            const msg = JSON.parse(dataString);
+
+            if (msg.type === 'state_update') {
+                if (myRole === 'parent') {
+                    hostGlobalState[msg.name] = msg.payload;
+                    const users = Object.values(hostGlobalState);
+                    analyzeGlobalStateAndCommand(users); 
+                }
+            } 
+            else if (msg.type === 'parent_command') {
+                if (msg.target === myName || msg.target === 'all') {
+                    document.getElementById('parent-command-alert').innerText = msg.message;
+                }
+            }
+            else if (msg.type === 'lonely_alert') {
+                if (myRole === 'parent') {
+                    broadcastP2PMessage(msg);
+                    if (msg.from !== myName) showLonelyOverlay();
+                } else {
+                    if (msg.from !== myName) showLonelyOverlay();
+                }
             }
         }
 
+        function broadcastP2PMessage(msgObj) {
+            if (myRole !== 'parent') return;
+            const msgString = JSON.stringify(msgObj);
+            Object.values(guestPeers).forEach(peer => {
+                if (peer.dc && peer.dc.readyState === 'open') {
+                    peer.dc.send(msgString);
+                }
+            });
+        }
+
+        function sendLonelyAlert() { 
+            const msg = { type: 'lonely_alert', from: myName };
+            if (myRole === 'parent') {
+                handleP2PMessage(JSON.stringify(msg)); 
+                broadcastP2PMessage(msg); 
+            } else if (hostPeer.dc && hostPeer.dc.readyState === 'open') {
+                hostPeer.dc.send(JSON.stringify(msg)); 
+            }
+        }
         function showLonelyOverlay() { document.getElementById('lonely-overlay').style.display = 'flex'; }
         function hideLonelyOverlay() { document.getElementById('lonely-overlay').style.display = 'none'; }
 
-        // --- 親機の分析機能 ---
         function analyzeGlobalStateAndCommand(users) {
             if (users.length < 2) return;
-            let overSpeaker = users.find(u => u.speakDuration > 150); 
+            let overSpeaker = users.find(u => u.speakDuration > 30); 
             if (overSpeaker) {
-                sendCommand(overSpeaker.name, "📢 少し話しすぎかもしれません。他の方に話を振ってみましょう。");
+                const cmd = { type: 'parent_command', target: overSpeaker.name, message: overSpeaker.name === myName ? "📢 あなたは30秒以上お話しされています。他の方に話を振ってみましょう！" : `📢 ${overSpeaker.name}さん、30秒以上お話しされています。そろそろ他の方に話を振ってみましょう！` };
+                handleP2PMessage(JSON.stringify(cmd)); broadcastP2PMessage(cmd);
+                return;
+            }
+            let overLooker = users.find(u => u.lookDuration >= 30);
+            if (overLooker) { 
+                const cmd = { type: 'parent_command', target: overLooker.name, message: `⚠️ 警告：${overLooker.lookingAt}さんを30秒以上見続けています。別の人にも顔を向けてみましょう。` };
+                handleP2PMessage(JSON.stringify(cmd)); broadcastP2PMessage(cmd);
                 return; 
             }
 
             let isolatedUsers = [];
             users.forEach(u => {
                 let isLookedAt = users.some(other => other.name !== u.name && other.lookingAt === u.name);
-                if (!isLookedAt && !u.speaking) {
-                    isolatedUsers.push(u.name);
-                }
+                if (!isLookedAt && !u.speaking) isolatedUsers.push(u.name);
             });
-
             if (isolatedUsers.length > 0) {
                 let currentSpeaker = users.find(u => u.speaking);
-                if (currentSpeaker) {
-                    sendCommand(currentSpeaker.name, `💡 ${isolatedUsers.join(', ')}さんが会話に入れていないようです。顔を向けてみましょう！`);
-                } else {
-                    sendCommand('all', `💡 ${isolatedUsers.join(', ')}さんに意見を聞いてみましょう！`);
-                }
-            } else {
-                sendCommand('all', "✨ 全員が参加できていて、良いバランスです！");
+                const cmd = { type: 'parent_command', target: currentSpeaker ? currentSpeaker.name : 'all', message: currentSpeaker ? `💡 ${isolatedUsers.join(', ')}さんが会話に入れていないようです。顔を向けてみましょう！` : `💡 ${isolatedUsers.join(', ')}さんに意見を聞いてみましょう！` };
+                handleP2PMessage(JSON.stringify(cmd)); broadcastP2PMessage(cmd);
+            } else { 
+                const cmd = { type: 'parent_command', target: 'all', message: "✨ 全員が参加できていて、良いバランスです！" };
+                handleP2PMessage(JSON.stringify(cmd)); broadcastP2PMessage(cmd);
             }
         }
 
-        function sendCommand(targetName, message) {
-            if(ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'parent_command', target: targetName, message: message }));
-            }
-        }
-
-        // --- マイク・カメラ解析 (以前と同じ) ---
         async function initAudio() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const analyser = audioContext.createAnalyser();
-                const microphone = audioContext.createMediaStreamSource(stream);
-                analyser.fftSize = 256; microphone.connect(analyser);
-                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                const analyser = audioContext.createAnalyser(); const microphone = audioContext.createMediaStreamSource(stream);
+                analyser.fftSize = 256; microphone.connect(analyser); const dataArray = new Uint8Array(analyser.frequencyBinCount);
                 function checkVolume() {
-                    analyser.getByteFrequencyData(dataArray);
-                    let sum = 0; for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-                    let average = sum / dataArray.length;
-                    if (average > 20) { isSpeaking = true; speakingTime++; document.getElementById('my-audio').innerText = "発言量: 🗣️ 発言中"; } 
-                    else { isSpeaking = false; speakingTime = 0; document.getElementById('my-audio').innerText = "発言量: ---"; }
+                    analyser.getByteFrequencyData(dataArray); let sum = 0; for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+                    isSpeaking = (sum / dataArray.length) > 20;
+                    document.getElementById('my-audio').innerText = isSpeaking ? "発言量: 🗣️ 発言中" : "発言量: ---";
                     requestAnimationFrame(checkVolume);
                 }
                 checkVolume();
-            } catch (err) { console.error("マイクエラー", err); document.getElementById('my-audio').innerText = "マイクエラー"; }
+            } catch (err) { console.error(err); document.getElementById('my-audio').innerText = "マイクエラー"; }
         }
 
         function initFaceMesh() {
-            const videoElement = document.getElementById('video');
-            const canvasElement = document.getElementById('output_canvas');
-            const canvasCtx = canvasElement.getContext('2d');
+            const videoElement = document.getElementById('video'); const canvasElement = document.getElementById('output_canvas'); const canvasCtx = canvasElement.getContext('2d');
             const faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
             faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
             faceMesh.onResults((results) => {
                 canvasCtx.save(); canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
                 if (results.image) canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
                 if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-                    const landmarks = results.multiFaceLandmarks[0];
-                    const nose = landmarks[1], leftEdge = landmarks[234], rightEdge = landmarks[454]; 
-                    const distLeft = Math.abs(nose.x - leftEdge.x), distRight = Math.abs(nose.x - rightEdge.x);
-                    let rawRatio = distLeft / (distLeft + distRight); 
+                    const landmarks = results.multiFaceLandmarks[0]; const nose = landmarks[1], leftEdge = landmarks[234], rightEdge = landmarks[454];
+                    const noseRelativeX = (nose.x - rightEdge.x) / (leftEdge.x - rightEdge.x);
+                    
                     const sensitivity = 2.5; 
-                    currentFaceRatio = Math.max(0, Math.min(1, 0.5 + (rawRatio - 0.5) * sensitivity)); 
+                    currentFaceRatio = Math.max(0, Math.min(1, 0.5 + (noseRelativeX - 0.5) * sensitivity));
+                    
                     let minDiff = 1.0;
                     registeredTargets.forEach(target => {
-                        let diff = Math.abs(currentFaceRatio - target.ratio);
-                        if (target.name === "正面") diff *= 0.85; 
+                        let diff = Math.abs(currentFaceRatio - target.ratio); if (target.name === "正面") diff *= 0.85;
                         if (diff < minDiff) { minDiff = diff; currentLookTarget = target.name; }
                     });
+                    canvasCtx.fillStyle = "red"; [nose, leftEdge, rightEdge].forEach(pt => { canvasCtx.beginPath(); canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, 4, 0, 2 * Math.PI); canvasCtx.fill(); });
                     document.getElementById('my-direction').innerHTML = `視線: <b>${currentLookTarget}</b> を見ています`;
                 }
                 canvasCtx.restore();
             });
-            const camera = new Camera(videoElement, { onFrame: async () => { await faceMesh.send({image: videoElement}); }, width: 640, height: 480 });
-            camera.start();
+            const camera = new Camera(videoElement, { onFrame: async () => { await faceMesh.send({image: videoElement}); }, width: 640, height: 480 }); camera.start();
         }
     </script>
 </body>
