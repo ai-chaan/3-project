@@ -268,7 +268,7 @@
             else if (msg.type === 'lonely_alert') {
                 if (myRole === 'parent') {
                     // ホストが受信したら全ゲストに転送（自分以外）
-                    broadcastToGuests(msg);
+                    broadcastToGuests(msg, msg.fromPeerId);
                     if (msg.from !== myName) showLonelyOverlay(msg.from);
                 } else {
                     if (msg.from !== myName) showLonelyOverlay(msg.from);
@@ -276,10 +276,10 @@
             }
         }
 
-        function broadcastToGuests(msgObj) {
+        function broadcastToGuests(msgObj, excludePeerId = null) {
             if (myRole !== 'parent') return;
             Object.values(connections).forEach(conn => {
-                if (conn.open) {
+                if (conn.open && conn.peer !== excludePeerId) {
                     conn.send(msgObj);
                 }
             });
@@ -287,10 +287,10 @@
 
         function sendLonelyAlert() { 
             console.log("Sending Lonely Alert...");
-            const msg = { type: 'lonely_alert', from: myName };
+            const msg = { type: 'lonely_alert', from: myName, fromPeerId: peer.id };
             if (myRole === 'parent') {
                 handleIncomingData(msg); 
-                broadcastToGuests(msg); 
+                broadcastToGuests(msg, peer.id); 
             } else if (hostConn && hostConn.open) {
                 hostConn.send(msg); 
             } else {
