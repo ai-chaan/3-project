@@ -33,7 +33,7 @@
 <body>
 
     <div id="lonely-overlay" class="lonely-overlay">
-        <div>📢 寂しいよ！</div>
+        <div>📢 <span id="lonely-user-name">誰か</span>が寂しいよ！</div>
         <div style="font-size: 24px; margin-top: 20px;">会話に入れていない人がいます</div>
         <button onclick="hideLonelyOverlay()" style="margin-top: 30px; background: white; color: #e74c3c; width: 200px;">閉じる</button>
     </div>
@@ -268,9 +268,9 @@
                 if (myRole === 'parent') {
                     // ホストが受信したら全ゲストに転送（自分以外）
                     broadcastToGuests(msg);
-                    if (msg.from !== myName) showLonelyOverlay();
+                    if (msg.from !== myName) showLonelyOverlay(msg.from);
                 } else {
-                    if (msg.from !== myName) showLonelyOverlay();
+                    if (msg.from !== myName) showLonelyOverlay(msg.from);
                 }
             }
         }
@@ -293,7 +293,10 @@
                 hostConn.send(msg); 
             }
         }
-        function showLonelyOverlay() { document.getElementById('lonely-overlay').style.display = 'flex'; }
+        function showLonelyOverlay(name) { 
+            document.getElementById('lonely-user-name').innerText = name || "誰か";
+            document.getElementById('lonely-overlay').style.display = 'flex'; 
+        }
         function hideLonelyOverlay() { document.getElementById('lonely-overlay').style.display = 'none'; }
 
         function analyzeGlobalStateAndCommand(users) {
