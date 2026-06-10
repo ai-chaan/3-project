@@ -252,6 +252,7 @@
         let hostGlobalState = {}; 
 
         function handleIncomingData(msg) {
+            console.log("Received P2P Message:", msg);
             if (msg.type === 'state_update') {
                 if (myRole === 'parent') {
                     hostGlobalState[msg.name] = msg.payload;
@@ -285,12 +286,16 @@
         }
 
         function sendLonelyAlert() { 
+            console.log("Sending Lonely Alert...");
             const msg = { type: 'lonely_alert', from: myName };
             if (myRole === 'parent') {
                 handleIncomingData(msg); 
                 broadcastToGuests(msg); 
             } else if (hostConn && hostConn.open) {
                 hostConn.send(msg); 
+            } else {
+                console.warn("Cannot send Lonely Alert: Not connected to host.");
+                alert("親機に接続されていません。接続を待機中か、エラーが発生しています。");
             }
         }
         function showLonelyOverlay(name) { 
