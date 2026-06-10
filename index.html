@@ -215,6 +215,7 @@
                 const myPayload = { 
                     type: 'state_update', 
                     name: myName, 
+                    peerId: peer.id,
                     payload: { 
                         name: myName, 
                         lookingAt: currentLookTarget, 
@@ -235,10 +236,20 @@
 
         function setupConnection(conn) {
             if (myRole === 'parent') {
-                connections[conn.peer] = conn;
                 conn.on('data', (data) => handleIncomingData(data));
                 conn.on('open', () => {
-                    console.log('Connected to guest: ' + conn.metadata.name);
+                    connections[conn.peer] = conn;
+                    console.log('Connected to guest: ' + (conn.metadata?.name || conn.peer));
+                });
+                conn.on('close', () => {
+                    console.log('Connection closed: ' + conn.peer);
+                    delete connections[conn.peer];
+                    const nameToRemove = Object.keys(hostGlobalState).find(name => hostGlobalState[name].peerId === conn.peer);
+                    if (nameToRemove) delete hostGlobalState[nameToRemove];
+                });
+                conn.on('error', (err) => {
+                    console.error('Connection error:', err);
+                    delete connections[conn.peer];
                 });
             } else {
                 hostConn = conn;
@@ -246,20 +257,27 @@
                 conn.on('open', () => {
                     console.log('Connected to host');
                 });
+                conn.on('close', () => {
+                    console.log('Host connection closed');
+                    alert("ホストとの接続が切れました。ページを更新して再接続してください。");
+                });
+                conn.on('error', (err) => {
+                    console.error('Host connection error:', err);
+                });
             }
         }
 
         let hostGlobalState = {}; 
-
-        function handleIncomingData(msg) {
-            console.log("Received P2P Message:", msg);
-            if (msg.type === 'state_update') {
-                if (myRole === 'parent') {
-                    hostGlobalState[msg.name] = msg.payload;
-                    const users = Object.values(hostGlobalState);
-                    analyzeGlobalStateAndCommand(users); 
-                }
-            } 
+function handleIncomingData(msg) {
+    console.log("Received P2P Message:", msg);
+    if (msg.type === 'state_update') {
+        if (myRole === 'parent') {
+            hostGlobalState[msg.name] = { ...msg.payload, peerId: msg.peerId };
+            const users = Object.values(hostGlobalState);
+            analyzeGlobalStateAndCommand(users); 
+        }
+    } 
+...
             else if (msg.type === 'parent_command') {
                 if (msg.target === myName || msg.target === 'all') {
                     document.getElementById('parent-command-alert').innerText = msg.message;
