@@ -17,6 +17,7 @@ wss.on('connection', (ws) => {
                 const roomCode = data.roomCode;
                 ws.roomCode = roomCode; // この接続がどの部屋に属しているか記憶
                 ws.userName = data.name;
+                ws.role = data.role; // 'host' or 'guest'
 
                 // 部屋が存在しなければ作成
                 if (!rooms[roomCode]) {
@@ -25,7 +26,15 @@ wss.on('connection', (ws) => {
                 }
                 
                 rooms[roomCode].clients.add(ws);
-                console.log(`${data.name} がルーム ${roomCode} に参加しました`);
+                console.log(`${data.name} (${data.role}) がルーム ${roomCode} に参加しました`);
+
+                // 子機が参加した場合、親機に通知する (WebRTC開始のトリガー)
+                if (data.role === 'guest') {
+                    broadcastToRoom(roomCode, {
+                        type: 'guest_joined',
+                        name: data.name
+                    }, 'host');
+                }
                 return;
             }
 
@@ -33,6 +42,12 @@ wss.on('connection', (ws) => {
             if (!ws.roomCode || !rooms[ws.roomCode]) return;
 
             const room = rooms[ws.roomCode];
+
+            // WebRTC シグナリングの転送 (特定のターゲットへ)
+            if (data.type === 'webrtc_offer' || data.type === 'webrtc_answer' || data.type === 'webrtc_ice_candidate') {
+                broadcastToRoom(ws.roomCode, data, null, data.target);
+                return;
+            }
 
             // 2. 状態のアップデートと部屋内への共有
             if (data.type === 'state_update') {
@@ -80,12 +95,16 @@ wss.on('connection', (ws) => {
     });
 });
 
-// 指定したルームの全員にメッセージを送る関数
-function broadcastToRoom(roomCode, messageObj) {
+// 指定したルームの全員（または特定の人）にメッセージを送る関数
+function broadcastToRoom(roomCode, messageObj, targetRole = null, targetName = null) {
     if (!rooms[roomCode]) return;
     const msgString = JSON.stringify(messageObj);
     rooms[roomCode].clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
+            // フィルタリング
+            if (targetRole && client.role !== targetRole) return;
+            if (targetName && client.userName !== targetName) return;
+            
             client.send(msgString);
         }
     });
