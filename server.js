@@ -1,10 +1,20 @@
-const WebSocket = require('ws');
-const wss = new WebSocket.Server({ port: 8080 });
+const { PeerServer } = require('peer');
 
-console.log('WebSocket server is running on port 8080 (currently unused by PeerJS implementation)');
+const PORT = 9000;
+const peerServer = PeerServer({
+    port: PORT,
+    path: '/peerjs',
+    corsOptions: {
+        origin: '*'
+    }
+});
 
-wss.on('connection', (ws) => {
-    ws.on('message', (message) => {
-        console.log('Received message:', message.toString());
-    });
+console.log(`✅ Local PeerServer running on http://localhost:${PORT}/peerjs`);
+
+peerServer.on('connection', (client) => {
+    console.log('Client connected:', client.getId());
+});
+
+peerServer.on('disconnect', (client) => {
+    console.log('Client disconnected:', client.getId());
 });

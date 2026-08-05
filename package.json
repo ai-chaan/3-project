@@ -1,1 +1,1 @@
-{"name": "ai-facilitator", "version": "1.0.0", "dependencies": {"ws": "^8.0.0"}}
+{"name":"ai-facilitator","version":"1.0.0","dependencies":{"peer":"^1.0.2","ws":"^8.21.0"}}

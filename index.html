@@ -79,6 +79,7 @@
 
         <div class="dashboard">
             <h3>📊 あなたの状況</h3>
+            <div class="status-item" id="p2p-status" style="font-weight: bold; color: #2980b9;">接続状態: 初期化前</div>
             <div class="status-item" id="my-direction">視線: 判定中...</div>
             <div class="status-item" id="my-audio" style="border-bottom: none;">発言量: 判定中...</div>
             
@@ -146,14 +147,14 @@
         }
 
         async function startSystem() {
-            myName = myNameInput.value; 
+            myName = myNameInput.value.trim() || "無名さん"; 
             const mode = document.querySelector('input[name="mode"]:checked').value;
             
             if (mode === 'host') { 
                 myRole = 'parent'; 
-                activeRoomCode = document.getElementById('generated-code').innerText; 
+                activeRoomCode = document.getElementById('generated-code').innerText.trim(); 
             } else { 
-                activeRoomCode = document.getElementById('join-code').value.toUpperCase(); 
+                activeRoomCode = document.getElementById('join-code').value.trim().toUpperCase(); 
                 myRole = 'child'; 
                 if (!activeRoomCode) return alert("招待コードを入力してください"); 
             }
@@ -163,6 +164,14 @@
             document.getElementById('role-badge').innerText = `ルーム: ${activeRoomCode} (${myRole === 'parent' ? '👑 ホスト' : '👤 ゲスト'})`;
             
             initPeerJS(); startDurationTimer(); await initAudio(); initFaceMesh();
+        }
+
+        function updateConnectionStatus(text, isError = false) {
+            const el = document.getElementById('p2p-status');
+            if (el) {
+                el.innerText = '接続: ' + text;
+                el.style.color = isError ? '#e74c3c' : '#27ae60';
+            }
         }
 
         function startDurationTimer() {
@@ -181,18 +190,45 @@
         let hostConn; // ゲスト用: ホストへの接続
 
         function initPeerJS() {
-            // ルームコードをPeerIDとして使用（親機）または接続先として使用（子機）
-            const peerId = myRole === 'parent' ? `room-${activeRoomCode}` : null;
-            peer = new Peer(peerId, {
-                debug: 2
-            });
+            const targetPeerId = `room-${activeRoomCode}`;
+            const peerId = myRole === 'parent' ? targetPeerId : null;
+            
+            updateConnectionStatus('通信サーバーに接続中...');
+
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+            if (isLocal) {
+                // ローカル環境: Port 9000のLocal PeerServerに接続
+                createPeer(peerId, {
+                    host: window.location.hostname,
+                    port: 9000,
+                    path: '/peerjs',
+                    debug: 2
+                });
+            } else {
+                // GitHub Pages等のHTTPS公開環境: PeerJS公式クラウドを利用
+                createPeer(peerId, { debug: 2 });
+            }
+        }
+
+        function createPeer(peerId, config) {
+            try {
+                peer = new Peer(peerId, config);
+            } catch(e) {
+                console.error("Peer creation failed:", e);
+                // Fallback to default PeerJS server if local server fails
+                peer = new Peer(peerId, { debug: 2 });
+            }
 
             peer.on('open', (id) => {
                 console.log('My peer ID is: ' + id);
-                if (myRole === 'child') {
-                    // ホストに接続
+                if (myRole === 'parent') {
+                    updateConnectionStatus(`🟢 ホスト待機中 (${activeRoomCode})`);
+                } else {
+                    updateConnectionStatus(`🟡 ホスト (${activeRoomCode}) に接続中...`);
                     const conn = peer.connect(`room-${activeRoomCode}`, {
-                        metadata: { name: myName }
+                        metadata: { name: myName },
+                        reliable: true
                     });
                     setupConnection(conn);
                 }
@@ -206,12 +242,19 @@
             peer.on('error', (err) => {
                 console.error('PeerJS error:', err);
                 if (err.type === 'peer-unavailable') {
-                    alert('ルームが見つかりません。招待コードが正しいか、ホストが開始しているか確認してください。');
+                    updateConnectionStatus('🔴 ホストが見つかりません', true);
+                    alert('ルーム「' + activeRoomCode + '」が見つかりません。\n\n【原因】\n1. ホスト（親機）がまだ「システム開始」を押していない可能性があります。\n2. 招待コードが間違っている可能性があります。\n\nホストがシステムを開始してから、ページを更新して再試行してください。');
+                } else if (err.type === 'unavailable-id') {
+                    updateConnectionStatus('🔴 ルームコード重複エラー', true);
+                    alert('このルームコードは既に使用されています。ページを更新して新しいコードを生成してください。');
+                } else {
+                    updateConnectionStatus('🔴 通信エラー: ' + err.type, true);
                 }
             });
 
             // 定期的な状態送信
             setInterval(() => {
+                if (!peer || peer.destroyed) return;
                 const myPayload = { 
                     type: 'state_update', 
                     name: myName, 
@@ -236,16 +279,19 @@
 
         function setupConnection(conn) {
             if (myRole === 'parent') {
-                conn.on('data', (data) => handleIncomingData(data));
                 conn.on('open', () => {
                     connections[conn.peer] = conn;
-                    console.log('Connected to guest: ' + (conn.metadata?.name || conn.peer));
+                    const guestName = conn.metadata?.name || conn.peer;
+                    console.log('Connected to guest: ' + guestName);
+                    updateConnectionStatus(`🟢 接続中 (ゲスト: ${guestName} 参加)`);
                 });
+                conn.on('data', (data) => handleIncomingData(data));
                 conn.on('close', () => {
                     console.log('Connection closed: ' + conn.peer);
                     delete connections[conn.peer];
                     const nameToRemove = Object.keys(hostGlobalState).find(name => hostGlobalState[name].peerId === conn.peer);
                     if (nameToRemove) delete hostGlobalState[nameToRemove];
+                    updateConnectionStatus(`🟡 ゲスト離脱 (${Object.keys(connections).length}名接続中)`);
                 });
                 conn.on('error', (err) => {
                     console.error('Connection error:', err);
@@ -253,16 +299,19 @@
                 });
             } else {
                 hostConn = conn;
-                conn.on('data', (data) => handleIncomingData(data));
                 conn.on('open', () => {
                     console.log('Connected to host');
+                    updateConnectionStatus('🟢 ホストと接続完了');
                 });
+                conn.on('data', (data) => handleIncomingData(data));
                 conn.on('close', () => {
                     console.log('Host connection closed');
+                    updateConnectionStatus('🔴 ホスト切断', true);
                     alert("ホストとの接続が切れました。ページを更新して再接続してください。");
                 });
                 conn.on('error', (err) => {
                     console.error('Host connection error:', err);
+                    updateConnectionStatus('🔴 接続エラー', true);
                 });
             }
         }
@@ -387,10 +436,26 @@
                     currentFaceRatio = Math.max(0, Math.min(1, 0.5 + (noseRelativeX - 0.5) * sensitivity));
                     
                     let minDiff = 1.0;
+                    let bestTarget = "正面";
+                    
+                    // 「正面」を除いたターゲットの中で最も近い人を探す
                     registeredTargets.forEach(target => {
-                        let diff = Math.abs(currentFaceRatio - target.ratio); if (target.name === "正面") diff *= 0.85;
-                        if (diff < minDiff) { minDiff = diff; currentLookTarget = target.name; }
+                        if (target.name === "正面") return;
+                        let diff = Math.abs(currentFaceRatio - target.ratio);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            bestTarget = target.name;
+                        }
                     });
+
+                    // 最も近い人が十分近い（例：差が0.15以内）ならその人を優先
+                    // そうでなければデフォルトの「正面」とする
+                    if (minDiff < 0.15) {
+                        currentLookTarget = bestTarget;
+                    } else {
+                        currentLookTarget = "正面";
+                    }
+
                     canvasCtx.fillStyle = "red"; [nose, leftEdge, rightEdge].forEach(pt => { canvasCtx.beginPath(); canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, 4, 0, 2 * Math.PI); canvasCtx.fill(); });
                     document.getElementById('my-direction').innerHTML = `視線: <b>${currentLookTarget}</b> を見ています`;
                 }
