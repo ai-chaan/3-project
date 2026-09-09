@@ -38,9 +38,9 @@
 <body>
 
     <div id="lonely-overlay" class="lonely-overlay">
-        <div>📢 <span id="lonely-user-name">誰か</span>が寂しいよ！</div>
-        <div style="font-size: 24px; margin-top: 20px;">会話に入れていない人がいます</div>
-        <button onclick="hideLonelyOverlay()" style="margin-top: 30px; background: white; color: #e74c3c; width: 200px;">閉じる</button>
+        <div>📢 メンバーの誰かが「寂しい」と感じています！</div>
+        <div style="font-size: 24px; margin-top: 20px;">会話に入れていない人がいます。みんなで意見を聞いてみましょう！</div>
+        <button onclick="hideLonelyOverlay()" style="margin-top: 30px; background: white; color: #e74c3c; width: 200px;">了解（閉じる）</button>
     </div>
 
     <h1 style="text-align: center;">🤖 チームファシリテーター (P2P通信)</h1>
@@ -473,10 +473,8 @@
             else if (msg.type === 'lonely_alert') {
                 if (myRole === 'parent') {
                     broadcastToGuests(msg, msg.fromPeerId);
-                    if (msg.from !== myName) showLonelyOverlay(msg.from);
-                } else {
-                    if (msg.from !== myName) showLonelyOverlay(msg.from);
                 }
+                showLonelyOverlay();
             }
         }
 
@@ -490,18 +488,18 @@
         }
 
         function sendLonelyAlert() { 
-            const msg = { type: 'lonely_alert', from: myName, fromPeerId: peer.id };
+            const msg = { type: 'lonely_alert', fromPeerId: peer.id };
             if (myRole === 'parent') {
                 handleIncomingData(msg); 
                 broadcastToGuests(msg, peer.id); 
             } else if (hostConn && hostConn.open) {
                 hostConn.send(msg); 
+                showLonelyOverlay();
             } else {
                 alert("親機に接続されていません。");
             }
         }
-        function showLonelyOverlay(name) { 
-            document.getElementById('lonely-user-name').innerText = name || "誰か";
+        function showLonelyOverlay() { 
             document.getElementById('lonely-overlay').style.display = 'flex'; 
         }
         function hideLonelyOverlay() { document.getElementById('lonely-overlay').style.display = 'none'; }
