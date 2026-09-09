@@ -539,6 +539,8 @@
             }
         }
 
+        let isAudioSpeaking = false, isMouthOpen = false;
+
         // --- マイク・カメラ制御 ---
         async function initAudio() {
             try {
@@ -548,12 +550,27 @@
                 analyser.fftSize = 256; microphone.connect(analyser); const dataArray = new Uint8Array(analyser.frequencyBinCount);
                 function checkVolume() {
                     analyser.getByteFrequencyData(dataArray); let sum = 0; for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-                    isSpeaking = (sum / dataArray.length) > 20;
-                    document.getElementById('my-audio').innerText = isSpeaking ? "発言量: 🗣️ 発言中" : "発言量: ---";
+                    isAudioSpeaking = (sum / dataArray.length) > 20;
+                    updateSpeakingStatus();
                     requestAnimationFrame(checkVolume);
                 }
                 checkVolume();
             } catch (err) { console.error(err); document.getElementById('my-audio').innerText = "マイクエラー"; }
+        }
+
+        function updateSpeakingStatus() {
+            isSpeaking = isAudioSpeaking || isMouthOpen;
+            const statusEl = document.getElementById('my-audio');
+            if (!statusEl) return;
+            if (isAudioSpeaking && isMouthOpen) {
+                statusEl.innerHTML = "発言量: 🗣️ <b>発言中</b> (マイク & 👄口元)";
+            } else if (isAudioSpeaking) {
+                statusEl.innerHTML = "発言量: 🗣️ <b>発言中</b> (音声)";
+            } else if (isMouthOpen) {
+                statusEl.innerHTML = "発言量: 👄 <b>口元動作検知</b>";
+            } else {
+                statusEl.innerText = "発言量: ---";
+            }
         }
 
         function initFaceMesh() {
@@ -564,7 +581,10 @@
                 canvasCtx.save(); canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
                 if (results.image) canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
                 if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-                    const landmarks = results.multiFaceLandmarks[0]; const nose = landmarks[1], leftEdge = landmarks[234], rightEdge = landmarks[454];
+                    const landmarks = results.multiFaceLandmarks[0]; 
+                    
+                    // 顔の向き・視線用ランドマーク
+                    const nose = landmarks[1], leftEdge = landmarks[234], rightEdge = landmarks[454];
                     const noseRelativeX = (nose.x - rightEdge.x) / (leftEdge.x - rightEdge.x);
                     
                     const sensitivity = 2.5; 
@@ -588,7 +608,39 @@
                         currentLookTarget = "正面";
                     }
 
-                    canvasCtx.fillStyle = "red"; [nose, leftEdge, rightEdge].forEach(pt => { canvasCtx.beginPath(); canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, 4, 0, 2 * Math.PI); canvasCtx.fill(); });
+                    // 👄 上唇・下唇・口角ランドマーク座標の取得
+                    const upperLip = landmarks[13];  // 上唇（内側中央）
+                    const lowerLip = landmarks[14];  // 下唇（内側中央）
+                    const mouthLeft = landmarks[61]; // 左口角
+                    const mouthRight = landmarks[291];// 右口角
+
+                    // 口の開き具合（縦幅 / 横幅 の比率）を判定
+                    const mouthHeight = Math.hypot(upperLip.x - lowerLip.x, upperLip.y - lowerLip.y);
+                    const mouthWidth = Math.hypot(mouthLeft.x - mouthRight.x, mouthLeft.y - mouthRight.y);
+                    const mouthOpenRatio = mouthWidth > 0 ? (mouthHeight / mouthWidth) : 0;
+
+                    // 口の開き判定（閾値: 0.20 以上）
+                    isMouthOpen = mouthOpenRatio > 0.20;
+                    updateSpeakingStatus();
+
+                    // --- 映像上へのデバッグ描画 ---
+                    // 1. 視線（鼻・顔の端）: 赤い点
+                    canvasCtx.fillStyle = "red"; 
+                    [nose, leftEdge, rightEdge].forEach(pt => { 
+                        canvasCtx.beginPath(); 
+                        canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, 4, 0, 2 * Math.PI); 
+                        canvasCtx.fill(); 
+                    });
+
+                    // 2. 口元（上唇・下唇・左右口角）: ライムグリーン（開口時は黄色で大きく光る）
+                    canvasCtx.fillStyle = isMouthOpen ? "#f1c40f" : "#2ecc71";
+                    const dotRadius = isMouthOpen ? 6 : 4;
+                    [upperLip, lowerLip, mouthLeft, mouthRight].forEach(pt => { 
+                        canvasCtx.beginPath(); 
+                        canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, dotRadius, 0, 2 * Math.PI); 
+                        canvasCtx.fill(); 
+                    });
+
                     document.getElementById('my-direction').innerHTML = `視線: <b>${currentLookTarget}</b> を見ています`;
                 }
                 canvasCtx.restore();
