@@ -2,13 +2,13 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>AI Facilitator - P2P完全修正版</title>
+    <title>AI Facilitator - P2P座席自動同期版</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { font-family: sans-serif; text-align: center; background-color: #f4f7f6; margin: 0; padding: 20px; }
-        .setup-box { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; min-width: 400px; text-align: left;}
+        .setup-box { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; min-width: 420px; text-align: left;}
         .main-container { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
         .video-box { position: fixed; top: 10px; right: 10px; z-index: 1000; width: 200px; height: 150px; }
         video { display: none; }
@@ -16,18 +16,23 @@
         .dashboard { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 400px; text-align: left; margin: 0 auto;}
         .global-alert { font-size: 16px; color: #e74c3c; font-weight: bold; background: #fdebd0; padding: 15px; border-radius: 5px; margin-top: 10px; min-height: 40px; border-left: 5px solid #e74c3c;}
         .status-item { margin-bottom: 10px; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
-        input[type="text"] { padding: 8px; margin: 0 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px;}
-        button { padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; width: 100%;}
+        input[type="text"] { padding: 8px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; width: 90%;}
+        button { padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; width: 100%; margin-top: 10px;}
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
         .mode-selector { margin: 15px 0; padding: 15px; background: #ecf0f1; border-radius: 5px;}
         .room-code-display { font-size: 24px; font-weight: bold; color: #2c3e50; letter-spacing: 2px; background: #fff; padding: 5px 10px; border-radius: 5px; display: inline-block;}
         .lonely-btn { background: #e74c3c; color: white; border: none; border-radius: 50%; width: 260px; height: 260px; font-size: 32px; font-weight: bold; cursor: pointer; box-shadow: 0 12px #c0392b; transition: all 0.1s; margin: 30px auto; display: block; outline: none; }
         .lonely-btn:active { box-shadow: 0 4px #c0392b; transform: translateY(8px); }
         .lonely-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(231, 76, 60, 0.9); color: white; z-index: 9999; justify-content: center; align-items: center; flex-direction: column; font-size: 48px; font-weight: bold; }
-        #seat-map { width: 400px; height: 320px; background: #e0e0e0; position: relative; margin: 20px auto; border: 5px solid #bdc3c7; }
-        .seat { width: 40px; height: 40px; border-radius: 4px; position: absolute; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; cursor: move; user-select: none; }
-        .seat.me { background: #3498db; cursor: default; }
-        .seat.other { background: #2ecc71; }
-        .seat-label { position: absolute; bottom: -20px; width: 100px; left: -30px; color: #333; text-align: center; white-space: nowrap; }
+        
+        #seat-map, #guest-seat-select-map { width: 400px; height: 300px; background: #e0e0e0; position: relative; margin: 15px auto; border: 4px solid #bdc3c7; border-radius: 8px;}
+        .seat { width: 44px; height: 44px; border-radius: 50%; position: absolute; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: bold; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);}
+        .seat.me { background: #3498db; border: 2px solid #2980b9; }
+        .seat.other { background: #2ecc71; border: 2px solid #27ae60; cursor: move; }
+        .seat.selectable { background: #9b59b6; border: 2px solid #8e44ad; cursor: pointer; }
+        .seat.selectable.selected { background: #e67e22; border: 2px solid #d35400; transform: scale(1.1); box-shadow: 0 0 10px #e67e22; }
+        .seat-label { position: absolute; bottom: -22px; width: 100px; left: -28px; color: #333; text-align: center; font-size: 12px; font-weight: bold; white-space: nowrap; text-shadow: 0 0 3px white;}
+        .info-tip { font-size: 13px; color: #555; background: #e8f4f8; padding: 10px; border-radius: 5px; border-left: 4px solid #3498db; margin-bottom: 10px;}
     </style>
 </head>
 <body>
@@ -42,31 +47,45 @@
 
     <div style="text-align: center;">
         <div class="setup-box" id="setup-area">
-            <div style="margin-bottom: 15px;">
-                <b>あなたの名前:</b> <input type="text" id="my-name" value="Aさん">
-            </div>
-
+            
             <div class="mode-selector">
                 <label><input type="radio" name="mode" value="host" checked onchange="toggleMode()"> <b>ルームを作る (親機)</b></label><br>
                 <label><input type="radio" name="mode" value="guest" onchange="toggleMode()"> <b>ルームに参加する (子機)</b></label>
                 
+                <!-- ホスト用パネル -->
                 <div id="host-panel" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ccc;">
+                    <div style="margin-bottom: 10px;">
+                        <b>ホストの名前:</b> <input type="text" id="host-my-name" value="ホスト(Aさん)">
+                    </div>
                     あなたの招待コード: <br>
                     <span class="room-code-display" id="generated-code"></span>
+                    
+                    <h3 style="margin-top:15px; margin-bottom:5px;">🪑 座席配置設定</h3>
+                    <div class="info-tip">
+                        マップ内をクリックして参加者を追加し、ドラッグで位置を調整してください。<br>ここでの名前と配置が全員に同期されます。
+                    </div>
+                    <div id="seat-map"></div>
+                    <button onclick="startHostSystem()">親機としてシステム開始</button>
                 </div>
 
+                <!-- ゲスト用パネル -->
                 <div id="guest-panel" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ccc; display: none;">
-                    ホストから聞いた招待コードを入力:<br>
-                    <input type="text" id="join-code" placeholder="例: ABCD" style="text-transform: uppercase;">
+                    <div id="guest-step-1">
+                        ホストから聞いた招待コードを入力:<br>
+                        <input type="text" id="join-code" placeholder="例: ABCD" style="text-transform: uppercase;"><br>
+                        <button onclick="connectAsGuest()">親機に接続して座席を取得</button>
+                    </div>
+
+                    <div id="guest-step-2" style="display: none;">
+                        <div class="info-tip">
+                            🟢 親機と接続完了！<br>以下の座席マップから<b>あなたの座席（お名前）</b>をタップして選んでください。
+                        </div>
+                        <div id="guest-seat-select-map"></div>
+                        <button id="btn-guest-start" disabled onclick="startGuestSystem()">選択した座席でシステム開始</button>
+                    </div>
                 </div>
             </div>
             
-            <h3>🪑 座席配置</h3>
-            <p style="font-size: 12px; color:#666;">グリッド内をクリックして参加者を追加し、ドラッグで位置を調整してください。</p>
-            <div id="seat-map">
-                <div class="seat me" id="seat-me" style="bottom: 0px; left: 160px;">私<div class="seat-label" id="my-name-label">Aさん</div></div>
-            </div>
-            <button onclick="startSystem()">システム開始</button>
         </div>
     </div>
 
@@ -96,12 +115,15 @@
         let speakDurationSeconds = 0, lookDurationSeconds = 0, lastLookTarget = "正面";
         let registeredTargets = [{ name: "正面", ratio: 0.5 }];
         
-        const seatMap = document.getElementById('seat-map'); 
-        const myNameInput = document.getElementById('my-name');
-        const myNameLabel = document.getElementById('my-name-label'); 
-        const seatMe = document.getElementById('seat-me');
-        let otherSeats = [];
+        // 座席データ構造: Array of { id, name, x, y, isHost }
+        let masterSeats = [
+            { id: 'seat-host', name: 'ホスト(Aさん)', x: 180, y: 240, isHost: true }
+        ];
+        let selectedGuestSeat = null; // 子機が選択した座席オブジェクト
 
+        const seatMap = document.getElementById('seat-map');
+        const guestSeatSelectMap = document.getElementById('guest-seat-select-map');
+        
         function generateRoomCode() { return Math.random().toString(36).substring(2, 6).toUpperCase(); }
         document.getElementById('generated-code').innerText = generateRoomCode();
         
@@ -111,59 +133,177 @@
             document.getElementById('guest-panel').style.display = mode === 'guest' ? 'block' : 'none';
         }
 
-        // --- 座席配置ドラッグ実装 ---
-        let draggingElement = null; let dragOffsetX = 0; let dragOffsetY = 0;
-        function setupDraggable(el) {
-            el.addEventListener('mousedown', (e) => {
-                draggingElement = el; const rect = el.getBoundingClientRect();
-                dragOffsetX = e.clientX - rect.left; dragOffsetY = e.clientY - rect.top;
-                el.style.zIndex = 1000; e.stopPropagation();
+        // --- ホスト用座席配置マップレンダリング & ドラッグ実装 ---
+        let draggingSeatId = null; let dragOffsetX = 0; let dragOffsetY = 0;
+
+        function renderHostSeatMap() {
+            seatMap.innerHTML = '';
+            masterSeats.forEach(seat => {
+                const el = document.createElement('div');
+                el.className = seat.isHost ? 'seat me' : 'seat other';
+                el.style.left = seat.x + 'px';
+                el.style.top = seat.y + 'px';
+                el.innerText = seat.name[0] || '席';
+
+                const label = document.createElement('div');
+                label.className = 'seat-label';
+                label.innerText = seat.name;
+                el.appendChild(label);
+
+                if (seat.isHost) {
+                    // ホストの名前変更に追従
+                    const hostNameInput = document.getElementById('host-my-name');
+                    if (hostNameInput) {
+                        hostNameInput.oninput = (e) => {
+                            seat.name = e.target.value.trim() || 'ホスト';
+                            renderHostSeatMap();
+                        };
+                    }
+                } else {
+                    // ドラッグ設定
+                    el.addEventListener('mousedown', (e) => {
+                        draggingSeatId = seat.id;
+                        const rect = el.getBoundingClientRect();
+                        dragOffsetX = e.clientX - rect.left;
+                        dragOffsetY = e.clientY - rect.top;
+                        el.style.zIndex = 1000;
+                        e.stopPropagation();
+                    });
+                }
+                seatMap.appendChild(el);
             });
         }
-        setupDraggable(seatMe);
-        
+
         window.addEventListener('mousemove', (e) => {
-            if (!draggingElement) return; const rect = seatMap.getBoundingClientRect();
-            let nx = e.clientX - rect.left - dragOffsetX; let ny = e.clientY - rect.top - dragOffsetY;
-            nx = Math.max(0, Math.min(rect.width - 40, nx)); ny = Math.max(0, Math.min(rect.height - 40, ny));
-            draggingElement.style.left = nx + 'px'; draggingElement.style.top = ny + 'px';
+            if (!draggingSeatId) return;
+            const seat = masterSeats.find(s => s.id === draggingSeatId);
+            if (!seat) return;
+            const rect = seatMap.getBoundingClientRect();
+            let nx = e.clientX - rect.left - dragOffsetX;
+            let ny = e.clientY - rect.top - dragOffsetY;
+            nx = Math.max(0, Math.min(rect.width - 44, nx));
+            ny = Math.max(0, Math.min(rect.height - 44, ny));
+            seat.x = nx;
+            seat.y = ny;
+            renderHostSeatMap();
+            broadcastSeatsToGuests(); // 移動中に子機へも同期
         });
-        window.addEventListener('mouseup', () => { if (draggingElement) { draggingElement.style.zIndex = ""; draggingElement = null; } });
 
+        window.addEventListener('mouseup', () => { draggingSeatId = null; });
+
+        // ホスト座席追加クリック
         seatMap.addEventListener('click', (e) => {
-            if (e.target !== seatMap) return; const name = prompt("参加者の名前を入力してください:"); if (!name) return;
-            const rect = seatMap.getBoundingClientRect(); const seat = document.createElement('div');
-            seat.className = 'seat other'; seat.style.left = (e.clientX - rect.left - 20) + 'px'; seat.style.top = (e.clientY - rect.top - 20) + 'px';
-            seat.innerText = name[0]; const label = document.createElement('div'); label.className = 'seat-label'; label.innerText = name;
-            seat.appendChild(label); seatMap.appendChild(seat); setupDraggable(seat); otherSeats.push({ name, element: seat });
+            if (e.target !== seatMap) return;
+            const name = prompt("参加者の名前を入力してください（例: Bさん）:");
+            if (!name) return;
+            const rect = seatMap.getBoundingClientRect();
+            const newSeat = {
+                id: 'seat-' + Date.now(),
+                name: name.trim(),
+                x: Math.max(0, Math.min(rect.width - 44, e.clientX - rect.left - 22)),
+                y: Math.max(0, Math.min(rect.height - 44, e.clientY - rect.top - 22)),
+                isHost: false
+            };
+            masterSeats.push(newSeat);
+            renderHostSeatMap();
+            broadcastSeatsToGuests();
         });
 
-        function calculateRatio(element) {
-            const meX = seatMe.offsetLeft + 20; const meY = seatMe.offsetTop + 20;
-            const targetX = element.offsetLeft + 20; const targetY = element.offsetTop + 20;
+        // 初期描画
+        renderHostSeatMap();
+
+        // 2点間の座標から相対的な視線角度比率(0.0 ~ 1.0)を計算
+        function calculateRatioBetween(mySeatPos, targetSeatPos) {
+            const meX = mySeatPos.x + 22;
+            const meY = mySeatPos.y + 22;
+            const targetX = targetSeatPos.x + 22;
+            const targetY = targetSeatPos.y + 22;
             let angle = Math.atan2(targetX - meX, -(targetY - meY));
             let ratio = 0.5 + (Math.sin(angle) * 0.5); 
             return Math.max(0, Math.min(1, ratio));
         }
 
-        async function startSystem() {
-            myName = myNameInput.value.trim() || "無名さん"; 
-            const mode = document.querySelector('input[name="mode"]:checked').value;
-            
-            if (mode === 'host') { 
-                myRole = 'parent'; 
-                activeRoomCode = document.getElementById('generated-code').innerText.trim(); 
-            } else { 
-                activeRoomCode = document.getElementById('join-code').value.trim().toUpperCase(); 
-                myRole = 'child'; 
-                if (!activeRoomCode) return alert("招待コードを入力してください"); 
-            }
-            
-            otherSeats.forEach(s => registeredTargets.push({ name: s.name, ratio: calculateRatio(s.element) }));
-            document.getElementById('setup-area').style.display = 'none'; document.getElementById('main-area').style.display = 'block';
-            document.getElementById('role-badge').innerText = `ルーム: ${activeRoomCode} (${myRole === 'parent' ? '👑 ホスト' : '👤 ゲスト'})`;
-            
-            initPeerJS(); startDurationTimer(); await initAudio(); initFaceMesh();
+        // 自分の位置を基準に全参加者の角度比率ターゲットを生成
+        function setupRegisteredTargetsFor(mySeatObj, allSeats) {
+            registeredTargets = [{ name: "正面", ratio: 0.5 }];
+            allSeats.forEach(seat => {
+                if (seat.id === mySeatObj.id || seat.name === mySeatObj.name) return;
+                const ratio = calculateRatioBetween(mySeatObj, seat);
+                registeredTargets.push({ name: seat.name, ratio: ratio });
+            });
+            console.log(`[視線ターゲット設定完了] 自分の席: ${mySeatObj.name}`, registeredTargets);
+        }
+
+        // --- ホスト起動 ---
+        async function startHostSystem() {
+            myRole = 'parent';
+            activeRoomCode = document.getElementById('generated-code').innerText.trim();
+            const hostSeat = masterSeats.find(s => s.isHost);
+            hostSeat.name = document.getElementById('host-my-name').value.trim() || "ホスト";
+            myName = hostSeat.name;
+
+            setupRegisteredTargetsFor(hostSeat, masterSeats);
+
+            document.getElementById('setup-area').style.display = 'none';
+            document.getElementById('main-area').style.display = 'block';
+            document.getElementById('role-badge').innerText = `ルーム: ${activeRoomCode} (👑 ホスト: ${myName})`;
+
+            initPeerJS();
+            startDurationTimer();
+            await initAudio();
+            initFaceMesh();
+        }
+
+        // --- ゲスト接続フェーズ ---
+        function connectAsGuest() {
+            activeRoomCode = document.getElementById('join-code').value.trim().toUpperCase();
+            if (!activeRoomCode) return alert("招待コードを入力してください");
+            myRole = 'child';
+
+            initPeerJS();
+        }
+
+        // 子機用：受信した座席マップの描画 & 選択UI
+        function renderGuestSeatSelectMap() {
+            guestSeatSelectMap.innerHTML = '';
+            masterSeats.forEach(seat => {
+                const el = document.createElement('div');
+                const isSelected = selectedGuestSeat && selectedGuestSeat.id === seat.id;
+                
+                el.className = 'seat selectable' + (isSelected ? ' selected' : '');
+                el.style.left = seat.x + 'px';
+                el.style.top = seat.y + 'px';
+                el.innerText = seat.name[0] || '席';
+
+                const label = document.createElement('div');
+                label.className = 'seat-label';
+                label.innerText = seat.isHost ? `${seat.name} (親機)` : seat.name;
+                el.appendChild(label);
+
+                el.onclick = () => {
+                    selectedGuestSeat = seat;
+                    renderGuestSeatSelectMap();
+                    document.getElementById('btn-guest-start').disabled = false;
+                };
+
+                guestSeatSelectMap.appendChild(el);
+            });
+        }
+
+        // ゲスト起動
+        async function startGuestSystem() {
+            if (!selectedGuestSeat) return alert("あなたの座席を選択してください");
+            myName = selectedGuestSeat.name;
+
+            setupRegisteredTargetsFor(selectedGuestSeat, masterSeats);
+
+            document.getElementById('setup-area').style.display = 'none';
+            document.getElementById('main-area').style.display = 'block';
+            document.getElementById('role-badge').innerText = `ルーム: ${activeRoomCode} (👤 ゲスト: ${myName})`;
+
+            startDurationTimer();
+            await initAudio();
+            initFaceMesh();
         }
 
         function updateConnectionStatus(text, isError = false) {
@@ -187,26 +327,18 @@
         // ==========================================
         let peer;
         let connections = {}; // ホスト用: { guestPeerId: conn }
-        let hostConn; // ゲスト用: ホストへの接続
+        let hostConn; // ゲスト用
 
         function initPeerJS() {
             const targetPeerId = `room-${activeRoomCode}`;
             const peerId = myRole === 'parent' ? targetPeerId : null;
             
             updateConnectionStatus('通信サーバーに接続中...');
-
             const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
             if (isLocal) {
-                // ローカル環境: Port 9000のLocal PeerServerに接続
-                createPeer(peerId, {
-                    host: window.location.hostname,
-                    port: 9000,
-                    path: '/peerjs',
-                    debug: 2
-                });
+                createPeer(peerId, { host: window.location.hostname, port: 9000, path: '/peerjs', debug: 2 });
             } else {
-                // GitHub Pages等のHTTPS公開環境: PeerJS公式クラウドを利用
                 createPeer(peerId, { debug: 2 });
             }
         }
@@ -216,7 +348,6 @@
                 peer = new Peer(peerId, config);
             } catch(e) {
                 console.error("Peer creation failed:", e);
-                // Fallback to default PeerJS server if local server fails
                 peer = new Peer(peerId, { debug: 2 });
             }
 
@@ -226,10 +357,7 @@
                     updateConnectionStatus(`🟢 ホスト待機中 (${activeRoomCode})`);
                 } else {
                     updateConnectionStatus(`🟡 ホスト (${activeRoomCode}) に接続中...`);
-                    const conn = peer.connect(`room-${activeRoomCode}`, {
-                        metadata: { name: myName },
-                        reliable: true
-                    });
+                    const conn = peer.connect(`room-${activeRoomCode}`, { reliable: true });
                     setupConnection(conn);
                 }
             });
@@ -243,18 +371,18 @@
                 console.error('PeerJS error:', err);
                 if (err.type === 'peer-unavailable') {
                     updateConnectionStatus('🔴 ホストが見つかりません', true);
-                    alert('ルーム「' + activeRoomCode + '」が見つかりません。\n\n【原因】\n1. ホスト（親機）がまだ「システム開始」を押していない可能性があります。\n2. 招待コードが間違っている可能性があります。\n\nホストがシステムを開始してから、ページを更新して再試行してください。');
+                    alert('ルーム「' + activeRoomCode + '」が見つかりません。\nホストがシステムを開始してから再試行してください。');
                 } else if (err.type === 'unavailable-id') {
                     updateConnectionStatus('🔴 ルームコード重複エラー', true);
-                    alert('このルームコードは既に使用されています。ページを更新して新しいコードを生成してください。');
+                    alert('このルームコードは既に使用されています。ページを更新してください。');
                 } else {
                     updateConnectionStatus('🔴 通信エラー: ' + err.type, true);
                 }
             });
 
-            // 定期的な状態送信
+            // 定期的な状態送信 (500ms)
             setInterval(() => {
-                if (!peer || peer.destroyed) return;
+                if (!peer || peer.destroyed || !myName) return;
                 const myPayload = { 
                     type: 'state_update', 
                     name: myName, 
@@ -269,7 +397,6 @@
                 };
 
                 if (myRole === 'parent') {
-                    // 自分自身の状態を分析に含める
                     handleIncomingData(myPayload);
                 } else if (hostConn && hostConn.open) {
                     hostConn.send(myPayload);
@@ -277,41 +404,41 @@
             }, 500);
         }
 
+        function broadcastSeatsToGuests() {
+            if (myRole !== 'parent') return;
+            const msg = { type: 'room_seats_sync', seats: masterSeats };
+            broadcastToGuests(msg);
+        }
+
         function setupConnection(conn) {
             if (myRole === 'parent') {
                 conn.on('open', () => {
                     connections[conn.peer] = conn;
-                    const guestName = conn.metadata?.name || conn.peer;
-                    console.log('Connected to guest: ' + guestName);
-                    updateConnectionStatus(`🟢 接続中 (ゲスト: ${guestName} 参加)`);
+                    console.log('Connected to guest peer: ' + conn.peer);
+                    updateConnectionStatus(`🟢 ゲスト接続中 (${Object.keys(connections).length}名)`);
+                    
+                    // 接続されたゲストへ最新の座席マップを送信
+                    conn.send({ type: 'room_seats_sync', seats: masterSeats });
                 });
                 conn.on('data', (data) => handleIncomingData(data));
                 conn.on('close', () => {
-                    console.log('Connection closed: ' + conn.peer);
                     delete connections[conn.peer];
                     const nameToRemove = Object.keys(hostGlobalState).find(name => hostGlobalState[name].peerId === conn.peer);
                     if (nameToRemove) delete hostGlobalState[nameToRemove];
                     updateConnectionStatus(`🟡 ゲスト離脱 (${Object.keys(connections).length}名接続中)`);
-                });
-                conn.on('error', (err) => {
-                    console.error('Connection error:', err);
-                    delete connections[conn.peer];
                 });
             } else {
                 hostConn = conn;
                 conn.on('open', () => {
                     console.log('Connected to host');
                     updateConnectionStatus('🟢 ホストと接続完了');
+                    document.getElementById('guest-step-1').style.display = 'none';
+                    document.getElementById('guest-step-2').style.display = 'block';
                 });
                 conn.on('data', (data) => handleIncomingData(data));
                 conn.on('close', () => {
-                    console.log('Host connection closed');
                     updateConnectionStatus('🔴 ホスト切断', true);
                     alert("ホストとの接続が切れました。ページを更新して再接続してください。");
-                });
-                conn.on('error', (err) => {
-                    console.error('Host connection error:', err);
-                    updateConnectionStatus('🔴 接続エラー', true);
                 });
             }
         }
@@ -319,8 +446,19 @@
         let hostGlobalState = {}; 
 
         function handleIncomingData(msg) {
-            console.log("Received P2P Message:", msg);
-            if (msg.type === 'state_update') {
+            if (msg.type === 'room_seats_sync') {
+                // 子機が親機から座席配置情報を受信
+                if (myRole === 'child') {
+                    masterSeats = msg.seats;
+                    renderGuestSeatSelectMap();
+                    // 既にスタート後ならターゲット比率を再計算
+                    if (selectedGuestSeat) {
+                        const updatedMySeat = masterSeats.find(s => s.id === selectedGuestSeat.id) || selectedGuestSeat;
+                        setupRegisteredTargetsFor(updatedMySeat, masterSeats);
+                    }
+                }
+            }
+            else if (msg.type === 'state_update') {
                 if (myRole === 'parent') {
                     hostGlobalState[msg.name] = { ...msg.payload, peerId: msg.peerId };
                     const users = Object.values(hostGlobalState);
@@ -334,7 +472,6 @@
             }
             else if (msg.type === 'lonely_alert') {
                 if (myRole === 'parent') {
-                    // ホストが受信したら全ゲストに転送（自分以外）
                     broadcastToGuests(msg, msg.fromPeerId);
                     if (msg.from !== myName) showLonelyOverlay(msg.from);
                 } else {
@@ -353,7 +490,6 @@
         }
 
         function sendLonelyAlert() { 
-            console.log("Sending Lonely Alert...");
             const msg = { type: 'lonely_alert', from: myName, fromPeerId: peer.id };
             if (myRole === 'parent') {
                 handleIncomingData(msg); 
@@ -361,8 +497,7 @@
             } else if (hostConn && hostConn.open) {
                 hostConn.send(msg); 
             } else {
-                console.warn("Cannot send Lonely Alert: Not connected to host.");
-                alert("親機に接続されていません。接続を待機中か、エラーが発生しています。");
+                alert("親機に接続されていません。");
             }
         }
         function showLonelyOverlay(name) { 
@@ -371,6 +506,7 @@
         }
         function hideLonelyOverlay() { document.getElementById('lonely-overlay').style.display = 'none'; }
 
+        // --- 全体分析ロジック ---
         function analyzeGlobalStateAndCommand(users) {
             if (users.length < 2) return;
             let overSpeaker = users.find(u => u.speakDuration > 30); 
@@ -405,6 +541,7 @@
             }
         }
 
+        // --- マイク・カメラ制御 ---
         async function initAudio() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -438,7 +575,6 @@
                     let minDiff = 1.0;
                     let bestTarget = "正面";
                     
-                    // 「正面」を除いたターゲットの中で最も近い人を探す
                     registeredTargets.forEach(target => {
                         if (target.name === "正面") return;
                         let diff = Math.abs(currentFaceRatio - target.ratio);
@@ -448,9 +584,7 @@
                         }
                     });
 
-                    // 最も近い人が十分近い（例：差が0.15以内）ならその人を優先
-                    // そうでなければデフォルトの「正面」とする
-                    if (minDiff < 0.15) {
+                    if (minDiff < 0.18) {
                         currentLookTarget = bestTarget;
                     } else {
                         currentLookTarget = "正面";
