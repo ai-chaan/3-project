@@ -541,6 +541,7 @@
 
         let isAudioSpeaking = false, isMouthOpen = false, isSmiling = false;
         let mouthHistory = [];
+        let speakingDebounceTimer = null;
 
         // --- マイク・カメラ制御 ---
         async function initAudio() {
@@ -551,7 +552,10 @@
                 analyser.fftSize = 256; microphone.connect(analyser); const dataArray = new Uint8Array(analyser.frequencyBinCount);
                 function checkVolume() {
                     analyser.getByteFrequencyData(dataArray); let sum = 0; for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-                    isAudioSpeaking = (sum / dataArray.length) > 20;
+                    const avgVolume = sum / dataArray.length;
+                    
+                    // マイク閾値を 35 に厳格化（雑音・呼吸音をカット）
+                    isAudioSpeaking = avgVolume > 35;
                     updateSpeakingStatus();
                     requestAnimationFrame(checkVolume);
                 }
@@ -560,7 +564,18 @@
         }
 
         function updateSpeakingStatus() {
-            isSpeaking = isAudioSpeaking || isMouthOpen;
+            // マイク音声または十分な口パク動作のいずれか確実なもの、あるいは両方の組み合わせ
+            const rawSpeaking = (isAudioSpeaking && isMouthOpen) || isAudioSpeaking || (isMouthOpen && mouthHistory.length >= 5);
+            
+            if (rawSpeaking) {
+                isSpeaking = true;
+                if (speakingDebounceTimer) clearTimeout(speakingDebounceTimer);
+                // 発言が終わっても1秒間は安定保持
+                speakingDebounceTimer = setTimeout(() => {
+                    isSpeaking = false;
+                }, 1000);
+            }
+
             const statusEl = document.getElementById('my-audio');
             if (!statusEl) return;
             
@@ -623,22 +638,22 @@
                     const mouthHeight = Math.hypot(upperLip.x - lowerLip.x, upperLip.y - lowerLip.y);
                     const mouthWidth = Math.hypot(mouthLeft.x - mouthRight.x, mouthLeft.y - mouthRight.y);
 
-                    // 2. 口の動的動き（パタパタ動いているか）の履歴チェック
+                    // 2. 口の動的動きの履歴チェック（閾値をより厳格に）
                     mouthHistory.push(mouthHeight);
                     if (mouthHistory.length > 8) mouthHistory.shift();
                     const mouthDelta = Math.max(...mouthHistory) - Math.min(...mouthHistory);
                     
-                    // 「口が上下に連続して動いている」ときのみ口パク（会話）と判定
-                    const isMouthMoving = mouthDelta > 0.018 && Math.max(...mouthHistory) > 0.025;
+                    // 「明確に上下に口を開閉して喋っている」ときのみ口パク判定（閾値を 0.018 → 0.038 に厳格化）
+                    const isMouthMoving = mouthDelta > 0.038 && Math.max(...mouthHistory) > 0.045;
 
-                    // 3. 「笑顔」の判定（口角がキュッと持ち上がり、横幅が広い）
+                    // 3. 「笑顔」の判定（口角が上がり、横幅が広がる）
                     const avgCornerY = (mouthLeft.y + mouthRight.y) / 2;
-                    const cornerLift = (upperLip.y - avgCornerY); // 口角と上唇の相対位置
-                    const isSmileShape = (avgCornerY < lowerLip.y) && (mouthWidth > 0.14) && (cornerLift > -0.015);
+                    const cornerLift = (upperLip.y - avgCornerY); 
+                    const isSmileShape = (avgCornerY < lowerLip.y) && (mouthWidth > 0.15) && (cornerLift > -0.010);
 
-                    // 笑っているが口パク運動が少ない場合は「笑顔」と認識し、喋り誤判定をブロック
+                    // 笑っているが口パク運動が少ない場合は「笑顔」とし、発言判定をブロック
                     isSmiling = isSmileShape && !isMouthMoving;
-                    isMouthOpen = isMouthMoving; // パクパク運動がある時のみ発言フラグON
+                    isMouthOpen = isMouthMoving;
 
                     updateSpeakingStatus();
 
