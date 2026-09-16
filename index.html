@@ -465,9 +465,14 @@
                     analyzeGlobalStateAndCommand(users); 
                 }
             } 
+            else if (msg.type === 'personal_command') {
+                const el = document.getElementById('parent-command-alert');
+                if (el) el.innerText = msg.message;
+            }
             else if (msg.type === 'parent_command') {
                 if (msg.target === myName || msg.target === 'all') {
-                    document.getElementById('parent-command-alert').innerText = msg.message;
+                    const el = document.getElementById('parent-command-alert');
+                    if (el) el.innerText = msg.message;
                 }
             }
             else if (msg.type === 'lonely_alert') {
@@ -487,6 +492,31 @@
             });
         }
 
+        // 各参加者の端末に個別のアドバイスを直接送信
+        function sendPersonalCommand(targetName, targetPeerId, message) {
+            // 親機自身宛ての場合
+            if (targetName === myName || (targetPeerId && peer && targetPeerId === peer.id)) {
+                const el = document.getElementById('parent-command-alert');
+                if (el) el.innerText = message;
+                return;
+            }
+
+            // 子機宛ての場合：該当の子機の接続にのみダイレクト送信
+            if (myRole === 'parent') {
+                const conn = connections[targetPeerId];
+                if (conn && conn.open) {
+                    conn.send({ type: 'personal_command', message: message });
+                } else {
+                    // フォールバック：全接続の中から一致するpeerを探す
+                    Object.values(connections).forEach(c => {
+                        if (c.open && c.peer === targetPeerId) {
+                            c.send({ type: 'personal_command', message: message });
+                        }
+                    });
+                }
+            }
+        }
+
         function sendLonelyAlert() { 
             const msg = { type: 'lonely_alert', fromPeerId: peer.id };
             if (myRole === 'parent') {
@@ -504,39 +534,65 @@
         }
         function hideLonelyOverlay() { document.getElementById('lonely-overlay').style.display = 'none'; }
 
-        // --- 全体分析ロジック ---
+        // --- 全体分析 & 個人別アドバイス生成ロジック ---
         function analyzeGlobalStateAndCommand(users) {
             if (users.length < 2) return;
-            let overSpeaker = users.find(u => u.speakDuration > 30); 
-            if (overSpeaker) {
-                const cmd = { type: 'parent_command', target: overSpeaker.name, message: overSpeaker.name === myName ? "📢 あなたは30秒以上お話しされています。他の方に話を振ってみましょう！" : `📢 ${overSpeaker.name}さん、30秒以上お話しされています。そろそろ他の方に話を振ってみましょう！` };
-                handleIncomingData(cmd); 
-                broadcastToGuests(cmd);
-                return;
-            }
-            let overLooker = users.find(u => u.lookDuration >= 30);
-            if (overLooker) { 
-                const cmd = { type: 'parent_command', target: overLooker.name, message: `⚠️ 警告：${overLooker.lookingAt}さんを30秒以上見続けています。別の人にも顔を向けてみましょう。` };
-                handleIncomingData(cmd); 
-                broadcastToGuests(cmd);
-                return; 
-            }
 
+            const overSpeakers = users.filter(u => u.speakDuration >= 30);
+            const overLookers = users.filter(u => u.lookDuration >= 30 && u.lookingAt !== "正面");
+            
+            // 孤立判定（誰からも見られておらず、自分も喋っていない人）
             let isolatedUsers = [];
             users.forEach(u => {
                 let isLookedAt = users.some(other => other.name !== u.name && other.lookingAt === u.name);
-                if (!isLookedAt && !u.speaking) isolatedUsers.push(u.name);
+                if (!isLookedAt && !u.speaking) {
+                    isolatedUsers.push(u.name);
+                }
             });
-            if (isolatedUsers.length > 0) {
-                let currentSpeaker = users.find(u => u.speaking);
-                const cmd = { type: 'parent_command', target: currentSpeaker ? currentSpeaker.name : 'all', message: currentSpeaker ? `💡 ${isolatedUsers.join(', ')}さんが会話に入れていないようです。顔を向けてみましょう！` : `💡 ${isolatedUsers.join(', ')}さんに意見を聞いてみましょう！` };
-                handleIncomingData(cmd); 
-                broadcastToGuests(cmd);
-            } else { 
-                const cmd = { type: 'parent_command', target: 'all', message: "✨ 全員が参加できていて、良いバランスです！" };
-                handleIncomingData(cmd); 
-                broadcastToGuests(cmd);
-            }
+
+            // 参加者一人ひとりに対して「その人専用のアドバイス」を作成して個別配信
+            users.forEach(u => {
+                let personalMsg = "";
+
+                // 1. 本人が30秒以上喋りすぎている場合
+                if (u.speakDuration >= 30) {
+                    personalMsg = "📢 あなたは30秒以上お話しされています。他の方に話を振ってみましょう！";
+                }
+                // 2. 本人が特定の人を30秒以上見つめすぎている場合
+                else if (u.lookDuration >= 30 && u.lookingAt !== "正面") {
+                    personalMsg = `⚠️ 警告：${u.lookingAt}さんを30秒以上見続けています。別の人にも顔を向けてみましょう。`;
+                }
+                // 3. 本人が会話に入れていない（孤立）場合
+                else if (isolatedUsers.includes(u.name)) {
+                    personalMsg = "💡 ぜひあなたの意見も聞かせてください！一言発言してみませんか？";
+                }
+                // 4. 他の人が会話に入れていない（孤立）場合
+                else if (isolatedUsers.length > 0) {
+                    const others = isolatedUsers.filter(name => name !== u.name);
+                    if (others.length > 0) {
+                        if (u.speaking) {
+                            personalMsg = `💡 ${others.join(', ')}さんが会話に入りづらそうです。顔を向けて話を振ってみましょう！`;
+                        } else {
+                            personalMsg = `💡 ${others.join(', ')}さんに意見を聞いてみましょう！`;
+                        }
+                    }
+                }
+                // 5. 他の誰かが30秒以上喋りすぎている場合
+                else if (overSpeakers.length > 0) {
+                    const otherSpeakers = overSpeakers.filter(s => s.name !== u.name);
+                    if (otherSpeakers.length > 0) {
+                        personalMsg = `⏳ ${otherSpeakers.map(s => s.name).join(', ')}さんが長くお話しされています。タイミングを見て発言してみましょう。`;
+                    }
+                }
+
+                // 6. 誰も問題がない場合は良好バランス
+                if (!personalMsg) {
+                    personalMsg = "✨ 全員が参加できていて、良いバランスです！";
+                }
+
+                // その人の端末だけに送信（他の人の端末には送らない）
+                sendPersonalCommand(u.name, u.peerId, personalMsg);
+            });
         }
 
         let isAudioSpeaking = false, isMouthOpen = false, isSmiling = false;
