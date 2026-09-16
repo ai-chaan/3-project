@@ -564,25 +564,28 @@
         }
 
         function updateSpeakingStatus() {
-            const rawSpeaking = (isAudioSpeaking && isMouthOpen) || isAudioSpeaking || isMouthOpen;
+            // ★ 本人の発話判定（音量 ＋ 口元の動作のAND条件）
+            // 他人の声をマイクが拾っても、自分の口が動いていなければ発話とみなさない
+            const isActuallySpeaking = isAudioSpeaking && isMouthOpen;
             
-            if (rawSpeaking) {
+            if (isActuallySpeaking) {
                 isSpeaking = true;
                 if (speakingDebounceTimer) clearTimeout(speakingDebounceTimer);
                 speakingDebounceTimer = setTimeout(() => {
                     isSpeaking = false;
+                    updateSpeakingStatus();
                 }, 800);
             }
 
             const statusEl = document.getElementById('my-audio');
             if (!statusEl) return;
             
-            if (isAudioSpeaking && isMouthOpen) {
+            if (isActuallySpeaking || isSpeaking) {
                 statusEl.innerHTML = "発言量: 🗣️ <b>発話中</b> (マイク & 👄口元運動)";
-            } else if (isAudioSpeaking) {
-                statusEl.innerHTML = "発言量: 🗣️ <b>発言中</b> (音声)";
+            } else if (isAudioSpeaking && !isMouthOpen) {
+                statusEl.innerHTML = "発言量: 👂 <b>周囲音感知</b> (口元静止のため非発話)";
             } else if (isMouthOpen) {
-                statusEl.innerHTML = "発言量: 👄 <b>発話(口元動作)検知</b>";
+                statusEl.innerHTML = "発言量: 👄 <b>口元動作検知</b> (無音)";
             } else if (isSmiling) {
                 statusEl.innerHTML = "発言量: 😊 <b>笑顔検知</b> (和やか)";
             } else {
