@@ -2,38 +2,42 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>AI Facilitator - P2P座席自動同期版</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background-color: #f4f7f6; margin: 0; padding: 20px; }
-        .setup-box { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; min-width: 420px; text-align: left;}
-        .main-container { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
+        * { box-sizing: border-box; }
+        body { font-family: sans-serif; text-align: center; background-color: #f4f7f6; margin: 0; padding: 20px 12px; }
+        h1 { font-size: 26px; }
+        .setup-box { background: white; padding: 20px; border-radius: 10px; margin: 0 auto 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 420px; text-align: left;}
+        .main-container { display: flex; justify-content: center; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
         .video-box { position: fixed; top: 10px; right: 10px; z-index: 1000; width: 200px; height: 150px; }
         video { display: none; }
-        canvas { border: 2px solid #333; border-radius: 8px; transform: scaleX(-1); width: 100%; height: auto; }
-        .dashboard { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 400px; text-align: left; margin: 0 auto;}
+        canvas { border: 2px solid #333; border-radius: 8px; transform: scaleX(-1); width: 100%; height: auto; display: block; }
+        .dashboard { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: left; margin: 0 auto;}
         .global-alert { font-size: 16px; color: #e74c3c; font-weight: bold; background: #fdebd0; padding: 15px; border-radius: 5px; margin-top: 10px; min-height: 40px; border-left: 5px solid #e74c3c;}
         .status-item { margin-bottom: 10px; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
         input[type="text"] { padding: 8px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; width: 90%;}
-        button { padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; width: 100%; margin-top: 10px;}
+        button { padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; width: 100%; margin-top: 10px; touch-action: manipulation;}
         button:disabled { background: #bdc3c7; cursor: not-allowed; }
         .mode-selector { margin: 15px 0; padding: 15px; background: #ecf0f1; border-radius: 5px;}
         .room-code-display { font-size: 24px; font-weight: bold; color: #2c3e50; letter-spacing: 2px; background: #fff; padding: 5px 10px; border-radius: 5px; display: inline-block;}
-        .lonely-btn { background: #e74c3c; color: white; border: none; border-radius: 50%; width: 260px; height: 260px; font-size: 32px; font-weight: bold; cursor: pointer; box-shadow: 0 12px #c0392b; transition: all 0.1s; margin: 30px auto; display: block; outline: none; }
+        .lonely-btn { background: #e74c3c; color: white; border: none; border-radius: 50%; width: 260px; height: 260px; max-width: 60vw; max-height: 60vw; font-size: 32px; font-weight: bold; cursor: pointer; box-shadow: 0 12px #c0392b; transition: all 0.1s; margin: 30px auto; display: block; outline: none; touch-action: manipulation;}
         .lonely-btn:active { box-shadow: 0 4px #c0392b; transform: translateY(8px); }
-        .lonely-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(231, 76, 60, 0.9); color: white; z-index: 9999; justify-content: center; align-items: center; flex-direction: column; font-size: 48px; font-weight: bold; }
-        
-        #seat-map, #guest-seat-select-map { width: 400px; height: 300px; background: #e0e0e0; position: relative; margin: 15px auto; border: 4px solid #bdc3c7; border-radius: 8px;}
-        .seat { width: 44px; height: 44px; border-radius: 50%; position: absolute; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: bold; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);}
+        .lonely-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(231, 76, 60, 0.9); color: white; z-index: 9999; justify-content: center; align-items: center; flex-direction: column; font-size: 32px; font-weight: bold; padding: 20px; text-align: center; }
+
+        #seat-map, #guest-seat-select-map { width: 100%; max-width: 400px; aspect-ratio: 4 / 3; background: #e0e0e0; position: relative; margin: 15px auto; border: 4px solid #bdc3c7; border-radius: 8px; touch-action: none;}
+        .seat { width: 44px; height: 44px; border-radius: 50%; position: absolute; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: bold; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2); touch-action: none;}
         .seat.me { background: #3498db; border: 2px solid #2980b9; }
         .seat.other { background: #2ecc71; border: 2px solid #27ae60; cursor: move; }
         .seat.selectable { background: #9b59b6; border: 2px solid #8e44ad; cursor: pointer; }
         .seat.selectable.selected { background: #e67e22; border: 2px solid #d35400; transform: scale(1.1); box-shadow: 0 0 10px #e67e22; }
         .seat-label { position: absolute; bottom: -22px; width: 100px; left: -28px; color: #333; text-align: center; font-size: 12px; font-weight: bold; white-space: nowrap; text-shadow: 0 0 3px white;}
         .info-tip { font-size: 13px; color: #555; background: #e8f4f8; padding: 10px; border-radius: 5px; border-left: 4px solid #3498db; margin-bottom: 10px;}
-        .analysis-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 560px; text-align: left; margin: 0 auto;}
+        .analysis-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 560px; text-align: left; margin: 0 auto;}
+        .analysis-table { min-width: 480px; }
         .analysis-table th, .analysis-table td { padding: 8px 6px; border-bottom: 1px solid #f0f0f0; }
         .badge-speaking { background: #e74c3c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
         .badge-idle { background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
@@ -41,6 +45,18 @@
         .badge-ok { color: #27ae60; font-weight: bold; }
         .badge-warn { color: #e67e22; font-weight: bold; }
         .badge-alert { color: #e74c3c; font-weight: bold; }
+
+        @media (max-width: 640px) {
+            body { padding: 14px 8px; }
+            h1 { font-size: 20px; margin: 10px 0; }
+            .setup-box, .dashboard, .analysis-card { padding: 14px; border-radius: 8px; }
+            .video-box { position: relative; top: auto; right: auto; width: 55vw; max-width: 220px; height: auto; margin: 0 auto 14px; }
+            .main-container { gap: 14px; }
+            .lonely-btn { width: 45vw; height: 45vw; max-width: 200px; max-height: 200px; font-size: 20px; margin: 20px auto; }
+            .seat { width: 36px; height: 36px; font-size: 11px; }
+            .seat-label { font-size: 10px; bottom: -18px; }
+            .room-code-display { font-size: 20px; }
+        }
     </style>
 </head>
 <body>
@@ -163,9 +179,9 @@
         let speakDurationSeconds = 0, lookDurationSeconds = 0, lastLookTarget = "正面";
         let registeredTargets = [{ name: "正面", ratio: 0.5 }];
         
-        // 座席データ構造: Array of { id, name, x, y, isHost }
+        // 座席データ構造: Array of { id, name, x, y, isHost } ※ x, y はマップ幅・高さに対する割合(%)
         let masterSeats = [
-            { id: 'seat-host', name: 'ホスト(Aさん)', x: 180, y: 240, isHost: true }
+            { id: 'seat-host', name: 'ホスト(Aさん)', x: 45, y: 80, isHost: true }
         ];
         let selectedGuestSeat = null; // 子機が選択した座席オブジェクト
 
@@ -181,7 +197,7 @@
             document.getElementById('guest-panel').style.display = mode === 'guest' ? 'block' : 'none';
         }
 
-        // --- ホスト用座席配置マップレンダリング & ドラッグ実装 ---
+        // --- ホスト用座席配置マップレンダリング & ドラッグ実装（マウス・タッチ両対応） ---
         let draggingSeatId = null; let dragOffsetX = 0; let dragOffsetY = 0;
 
         function renderHostSeatMap() {
@@ -189,8 +205,8 @@
             masterSeats.forEach(seat => {
                 const el = document.createElement('div');
                 el.className = seat.isHost ? 'seat me' : 'seat other';
-                el.style.left = seat.x + 'px';
-                el.style.top = seat.y + 'px';
+                el.style.left = seat.x + '%';
+                el.style.top = seat.y + '%';
                 el.innerText = seat.name[0] || '席';
 
                 const label = document.createElement('div');
@@ -208,66 +224,88 @@
                         };
                     }
                 } else {
-                    // ドラッグ設定
+                    // ドラッグ設定（マウス）
                     el.addEventListener('mousedown', (e) => {
-                        draggingSeatId = seat.id;
-                        const rect = el.getBoundingClientRect();
-                        dragOffsetX = e.clientX - rect.left;
-                        dragOffsetY = e.clientY - rect.top;
-                        el.style.zIndex = 1000;
+                        startSeatDrag(seat.id, el, e.clientX, e.clientY);
                         e.stopPropagation();
                     });
+                    // ドラッグ設定（タッチ）
+                    el.addEventListener('touchstart', (e) => {
+                        const t = e.touches[0];
+                        startSeatDrag(seat.id, el, t.clientX, t.clientY);
+                        e.stopPropagation();
+                        e.preventDefault();
+                    }, { passive: false });
                 }
                 seatMap.appendChild(el);
             });
         }
 
-        window.addEventListener('mousemove', (e) => {
+        function startSeatDrag(seatId, el, clientX, clientY) {
+            draggingSeatId = seatId;
+            const rect = el.getBoundingClientRect();
+            dragOffsetX = clientX - rect.left;
+            dragOffsetY = clientY - rect.top;
+            el.style.zIndex = 1000;
+        }
+
+        function moveSeatDrag(clientX, clientY) {
             if (!draggingSeatId) return;
             const seat = masterSeats.find(s => s.id === draggingSeatId);
             if (!seat) return;
             const rect = seatMap.getBoundingClientRect();
-            let nx = e.clientX - rect.left - dragOffsetX;
-            let ny = e.clientY - rect.top - dragOffsetY;
-            nx = Math.max(0, Math.min(rect.width - 44, nx));
-            ny = Math.max(0, Math.min(rect.height - 44, ny));
-            seat.x = nx;
-            seat.y = ny;
+            const seatSize = 44;
+            let nx = clientX - rect.left - dragOffsetX;
+            let ny = clientY - rect.top - dragOffsetY;
+            nx = Math.max(0, Math.min(rect.width - seatSize, nx));
+            ny = Math.max(0, Math.min(rect.height - seatSize, ny));
+            seat.x = (nx / rect.width) * 100;
+            seat.y = (ny / rect.height) * 100;
             renderHostSeatMap();
             broadcastSeatsToGuests(); // 移動中に子機へも同期
-        });
+        }
 
+        window.addEventListener('mousemove', (e) => moveSeatDrag(e.clientX, e.clientY));
         window.addEventListener('mouseup', () => { draggingSeatId = null; });
+        window.addEventListener('touchmove', (e) => {
+            if (!draggingSeatId) return;
+            const t = e.touches[0];
+            moveSeatDrag(t.clientX, t.clientY);
+            e.preventDefault();
+        }, { passive: false });
+        window.addEventListener('touchend', () => { draggingSeatId = null; });
 
-        // ホスト座席追加クリック
-        seatMap.addEventListener('click', (e) => {
-            if (e.target !== seatMap) return;
+        // ホスト座席追加（クリック／タップ共通）
+        function addSeatAt(clientX, clientY) {
             const name = prompt("参加者の名前を入力してください（例: Bさん）:");
             if (!name) return;
             const rect = seatMap.getBoundingClientRect();
+            const seatSize = 44;
+            const nx = Math.max(0, Math.min(rect.width - seatSize, clientX - rect.left - seatSize / 2));
+            const ny = Math.max(0, Math.min(rect.height - seatSize, clientY - rect.top - seatSize / 2));
             const newSeat = {
                 id: 'seat-' + Date.now(),
                 name: name.trim(),
-                x: Math.max(0, Math.min(rect.width - 44, e.clientX - rect.left - 22)),
-                y: Math.max(0, Math.min(rect.height - 44, e.clientY - rect.top - 22)),
+                x: (nx / rect.width) * 100,
+                y: (ny / rect.height) * 100,
                 isHost: false
             };
             masterSeats.push(newSeat);
             renderHostSeatMap();
             broadcastSeatsToGuests();
+        }
+        seatMap.addEventListener('click', (e) => {
+            if (e.target !== seatMap) return;
+            addSeatAt(e.clientX, e.clientY);
         });
 
         // 初期描画
         renderHostSeatMap();
 
-        // 2点間の座標から相対的な視線角度比率(0.0 ~ 1.0)を計算
+        // 2点間の座標(割合%)から相対的な視線角度比率(0.0 ~ 1.0)を計算
         function calculateRatioBetween(mySeatPos, targetSeatPos) {
-            const meX = mySeatPos.x + 22;
-            const meY = mySeatPos.y + 22;
-            const targetX = targetSeatPos.x + 22;
-            const targetY = targetSeatPos.y + 22;
-            let angle = Math.atan2(targetX - meX, -(targetY - meY));
-            let ratio = 0.5 + (Math.sin(angle) * 0.5); 
+            let angle = Math.atan2(targetSeatPos.x - mySeatPos.x, -(targetSeatPos.y - mySeatPos.y));
+            let ratio = 0.5 + (Math.sin(angle) * 0.5);
             return Math.max(0, Math.min(1, ratio));
         }
 
@@ -320,8 +358,8 @@
                 const isSelected = selectedGuestSeat && selectedGuestSeat.id === seat.id;
                 
                 el.className = 'seat selectable' + (isSelected ? ' selected' : '');
-                el.style.left = seat.x + 'px';
-                el.style.top = seat.y + 'px';
+                el.style.left = seat.x + '%';
+                el.style.top = seat.y + '%';
                 el.innerText = seat.name[0] || '席';
 
                 const label = document.createElement('div');
