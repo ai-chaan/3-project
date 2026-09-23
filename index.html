@@ -9,7 +9,9 @@
     <style>
         html, body { height: 100%; }
         body { font-family: sans-serif; text-align: center; background-color: #f4f7f6; margin: 0; padding: 10px 20px; box-sizing: border-box; }
-        .setup-box { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; min-width: 420px; text-align: left;}
+        .setup-box { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; min-width: 420px; text-align: left; max-height: calc(100vh - 40px); overflow-y: auto; box-sizing: border-box; }
+        .host-settings-columns { display: flex; gap: 25px; align-items: flex-start; flex-wrap: wrap; }
+        .host-col { flex: 1 1 380px; min-width: 380px; }
         .main-container { display: flex; justify-content: center; align-items: flex-start; gap: 20px; flex-wrap: nowrap; height: calc(100vh - 70px); }
         .camera-column { display: flex; flex-direction: column; gap: 15px; width: 340px; height: 100%; flex-shrink: 0; order: 2; }
         .dashboard { order: 1; }
@@ -72,47 +74,53 @@
                 
                 <!-- ホスト用パネル -->
                 <div id="host-panel" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ccc;">
-                    <div style="margin-bottom: 10px;">
-                        <b>ホストの名前:</b> <input type="text" id="host-my-name" value="ホスト(Aさん)">
-                    </div>
-                    あなたの招待コード: <br>
-                    <span class="room-code-display" id="generated-code"></span>
-                    
-                    <h3 style="margin-top:15px; margin-bottom:5px;">🪑 座席配置設定</h3>
-                    <div class="info-tip">
-                        マップ内をクリックして参加者を追加し、ドラッグで位置を調整してください。<br>ここでの名前と配置が全員に同期されます。
-                    </div>
-                    <div id="seat-map"></div>
+                    <div class="host-settings-columns">
+                        <div class="host-col">
+                            <div style="margin-bottom: 10px;">
+                                <b>ホストの名前:</b> <input type="text" id="host-my-name" value="ホスト(Aさん)">
+                            </div>
+                            あなたの招待コード: <br>
+                            <span class="room-code-display" id="generated-code"></span>
 
-                    <h3 style="margin-top:15px; margin-bottom:5px;">📈 分析ダッシュボードの見せ方</h3>
-                    <div class="option-card-group" id="analysis-display-mode-group">
-                        <label class="option-card">
-                            <input type="radio" name="analysis-display-mode" value="full" checked>
-                            <span><span class="option-title">📊 くわしく見る</span><br><span class="option-desc">表・グラフ・CSV保存まで全部使う</span></span>
-                        </label>
-                        <label class="option-card">
-                            <input type="radio" name="analysis-display-mode" value="simple">
-                            <span><span class="option-title">📈 かんたんに見る</span><br><span class="option-desc">発言バランスのバーだけ、パッと見られる</span></span>
-                        </label>
-                        <label class="option-card">
-                            <input type="radio" name="analysis-display-mode" value="hidden">
-                            <span><span class="option-title">🚫 見せない</span><br><span class="option-desc">分析ダッシュボードを表示しない</span></span>
-                        </label>
-                    </div>
+                            <h3 style="margin-top:15px; margin-bottom:5px;">🪑 座席配置設定</h3>
+                            <div class="info-tip">
+                                マップ内をクリックして参加者を追加し、ドラッグで位置を調整してください。<br>ここでの名前と配置が全員に同期されます。
+                            </div>
+                            <div id="seat-map"></div>
+                        </div>
 
-                    <h3 style="margin-top:15px; margin-bottom:5px;">👀 だれに見せる？</h3>
-                    <div class="option-card-group" id="analysis-visibility-scope-group">
-                        <label class="option-card">
-                            <input type="radio" name="analysis-visibility-scope" value="all" checked>
-                            <span><span class="option-title">👥 みんなに見せる</span><br><span class="option-desc">参加者全員の画面に表示する</span></span>
-                        </label>
-                        <label class="option-card">
-                            <input type="radio" name="analysis-visibility-scope" value="host">
-                            <span><span class="option-title">👑 自分だけ見る</span><br><span class="option-desc">親機の画面にだけ表示（子機には出さない）</span></span>
-                        </label>
-                    </div>
+                        <div class="host-col">
+                            <h3 style="margin-top:0; margin-bottom:5px;">📈 分析ダッシュボードの見せ方</h3>
+                            <div class="option-card-group" id="analysis-display-mode-group">
+                                <label class="option-card">
+                                    <input type="radio" name="analysis-display-mode" value="full" checked>
+                                    <span><span class="option-title">📊 くわしく見る</span><br><span class="option-desc">表・グラフ・CSV保存まで全部使う</span></span>
+                                </label>
+                                <label class="option-card">
+                                    <input type="radio" name="analysis-display-mode" value="simple">
+                                    <span><span class="option-title">📈 かんたんに見る</span><br><span class="option-desc">発言バランスのバーだけ、パッと見られる</span></span>
+                                </label>
+                                <label class="option-card">
+                                    <input type="radio" name="analysis-display-mode" value="hidden">
+                                    <span><span class="option-title">🚫 見せない</span><br><span class="option-desc">分析ダッシュボードを表示しない</span></span>
+                                </label>
+                            </div>
 
-                    <button onclick="startHostSystem()">親機としてシステム開始</button>
+                            <h3 style="margin-top:15px; margin-bottom:5px;">👀 だれに見せる？</h3>
+                            <div class="option-card-group" id="analysis-visibility-scope-group">
+                                <label class="option-card">
+                                    <input type="radio" name="analysis-visibility-scope" value="all" checked>
+                                    <span><span class="option-title">👥 みんなに見せる</span><br><span class="option-desc">参加者全員の画面に表示する</span></span>
+                                </label>
+                                <label class="option-card">
+                                    <input type="radio" name="analysis-visibility-scope" value="host">
+                                    <span><span class="option-title">👑 自分だけ見る</span><br><span class="option-desc">親機の画面にだけ表示（子機には出さない）</span></span>
+                                </label>
+                            </div>
+
+                            <button onclick="startHostSystem()">親機としてシステム開始</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- ゲスト用パネル -->
