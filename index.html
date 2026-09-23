@@ -839,6 +839,18 @@
         let mouthMotionHistory = []; // 口の発話運動量の履歴
         let speakingDebounceTimer = null;
 
+        // 表示のちらつき防止: 状態が変わっても一定時間は表示を保持する
+        const displayHoldState = {};
+        const DISPLAY_HOLD_MS = 1000;
+        function heldDisplayUpdate(key, state, applyFn) {
+            const now = performance.now();
+            const rec = displayHoldState[key];
+            if (!rec || state === rec.state || now - rec.time > DISPLAY_HOLD_MS) {
+                if (!rec || state !== rec.state) displayHoldState[key] = { state, time: now };
+                applyFn();
+            }
+        }
+
         // --- マイク・カメラ制御 ---
         async function initAudio() {
             try {
@@ -850,7 +862,12 @@
                     analyser.getByteFrequencyData(dataArray); let sum = 0; for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
                     const avgVolume = sum / dataArray.length;
                     
-                    isAudioSpeaking = avgVolume > 35;
+                    // ヒステリシス: ON/OFFの閾値をずらし、境界付近での細かいON/OFF切り替えを防ぐ
+                    if (isAudioSpeaking) {
+                        isAudioSpeaking = avgVolume > 25;
+                    } else {
+                        isAudioSpeaking = avgVolume > 40;
+                    }
                     updateSpeakingStatus();
                     requestAnimationFrame(checkVolume);
                 }
@@ -874,18 +891,25 @@
 
             const statusEl = document.getElementById('my-audio');
             if (!statusEl) return;
-            
+
+            let state, render;
             if (isActuallySpeaking || isSpeaking) {
-                statusEl.innerHTML = "発言量: 🗣️ <b>発話中</b> (マイク & 👄口元運動)";
+                state = 'speaking';
+                render = () => statusEl.innerHTML = "発言量: 🗣️ <b>発話中</b> (マイク & 👄口元運動)";
             } else if (isAudioSpeaking && !isMouthOpen) {
-                statusEl.innerHTML = "発言量: 👂 <b>周囲音感知</b> (口元静止のため非発話)";
+                state = 'ambient';
+                render = () => statusEl.innerHTML = "発言量: 👂 <b>周囲音感知</b> (口元静止のため非発話)";
             } else if (isMouthOpen) {
-                statusEl.innerHTML = "発言量: 👄 <b>口元動作検知</b> (無音)";
+                state = 'mouth';
+                render = () => statusEl.innerHTML = "発言量: 👄 <b>口元動作検知</b> (無音)";
             } else if (isSmiling) {
-                statusEl.innerHTML = "発言量: 😊 <b>笑顔検知</b> (和やか)";
+                state = 'smile';
+                render = () => statusEl.innerHTML = "発言量: 😊 <b>笑顔検知</b> (和やか)";
             } else {
-                statusEl.innerText = "発言量: ---";
+                state = 'idle';
+                render = () => statusEl.innerText = "発言量: ---";
             }
+            heldDisplayUpdate('audio', state, render);
         }
 
         function initFaceMesh() {
@@ -990,7 +1014,9 @@
                         canvasCtx.fill(); 
                     });
 
-                    document.getElementById('my-direction').innerHTML = `視線: <b>${currentLookTarget}</b> を見ています`;
+                    heldDisplayUpdate('direction', currentLookTarget, () => {
+                        document.getElementById('my-direction').innerHTML = `視線: <b>${currentLookTarget}</b> を見ています`;
+                    });
                 }
                 canvasCtx.restore();
             });
