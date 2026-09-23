@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Facilitator - 管理ダッシュボード</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Loading spinner */
+        .spinner { border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top: 3px solid white; width: 18px; height: 18px; animation: spin 0.8s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px;}
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="text-slate-800 h-screen overflow-hidden flex flex-col">
+
+    <!-- 接続画面 (初期状態) -->
+    <div id="connect-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-100 p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-xl border border-slate-200 max-w-md w-full text-center">
+            <div class="text-5xl mb-4">📊</div>
+            <h1 class="text-2xl font-bold text-slate-800 mb-2">AI Facilitator ダッシュボード</h1>
+            <p class="text-sm text-slate-500 mb-6">ホスト端末の招待コードを入力して接続してください</p>
+            
+            <div class="space-y-4 text-left">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">招待コード</label>
+                    <input type="text" id="join-code" placeholder="例: ABCD" maxlength="8"
+                        class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl font-bold tracking-widest uppercase transition-all shadow-sm">
+                </div>
+                <button id="connect-btn" onclick="connectToHost()" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center text-base">
+                    <span id="btn-text">ホストに接続して監視開始</span>
+                </button>
+                <div id="connection-error" class="text-red-500 text-xs text-center font-medium min-h-[20px] opacity-0 transition-opacity"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ダッシュボード画面 (接続後) -->
+    <div id="dashboard-screen" class="hidden flex-1 flex flex-col h-full fade-in">
+        <!-- ナビゲーションバー -->
+        <header class="bg-white border-b border-slate-200 px-6 py-3.5 flex justify-between items-center shrink-0 shadow-sm z-10">
+            <div class="flex items-center gap-4">
+                <div class="bg-blue-600 text-white p-2 rounded-xl shadow-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                </div>
+                <div>
+                    <div class="flex items-center gap-3">
+                        <h1 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            ルーム: <span id="display-room-code" class="text-blue-600 tracking-wider">----</span>
+                        </h1>
+                        <span id="live-indicator" class="flex items-center gap-1.5 text-green-700 bg-green-50 px-2.5 py-0.5 rounded-full border border-green-200 text-xs font-semibold">
+                            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> LIVE 接続中
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400">リアルタイム会話分析 & AIファシリテーション監視システム</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="downloadAnalysisCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    CSVダウンロード
+                </button>
+                <button onclick="location.reload()" class="text-xs font-medium text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-lg transition-colors">
+                    切断して戻る
+                </button>
+            </div>
+        </header>
+        
+        <!-- メインコンテンツエリア -->
+        <main class="flex-1 overflow-y-auto p-5 bg-slate-50">
+            <div class="max-w-7xl mx-auto space-y-5">
+                
+                <!-- KPI カード群 -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 border-l-4 border-l-blue-500 flex items-center justify-between">
+                        <div>
+                            <p class="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">参加人数</p>
+                            <div class="text-2xl font-bold text-slate-800" id="kpi-users">0 <span class="text-xs font-normal text-slate-400">名</span></div>
+                        </div>
+                        <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg font-bold">👥</div>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 border-l-4 border-l-indigo-500 flex items-center justify-between">
+                        <div>
+                            <p class="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">会議経過時間</p>
+                            <div class="text-2xl font-bold text-slate-800 font-mono" id="kpi-time">00:00</div>
+                        </div>
+                        <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg font-bold">⏱️</div>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 border-l-4 border-l-red-500 flex items-center justify-between">
+                        <div>
+                            <p class="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">寂しいよ発信</p>
+                            <div class="text-2xl font-bold text-red-500" id="kpi-lonely">0 <span class="text-xs font-normal text-slate-400">回</span></div>
+                        </div>
+                        <div class="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center text-lg font-bold">🥺</div>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 border-l-4 border-l-emerald-500 flex items-center justify-between">
+                        <div>
+                            <p class="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">総発言時間</p>
+                            <div class="text-2xl font-bold text-emerald-600 font-mono" id="kpi-speak">0秒</div>
+                        </div>
+                        <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg font-bold">🗣️</div>
+                    </div>
+                </div>
+
+                <!-- 発話バランス比率プログレスバー -->
+                <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-center text-xs font-bold text-slate-600 mb-2">
+                        <span class="flex items-center gap-1.5">
+                            <span>🗣️ 発言バランス比率</span>
+                            <span class="text-[10px] font-normal text-slate-400">（各参加者の発言シェア）</span>
+                        </span>
+                        <span id="talk-ratio-summary" class="text-slate-500 font-mono text-[11px]">総発話: 0秒</span>
+                    </div>
+                    <div id="talk-ratio-bar" class="h-3.5 bg-slate-100 rounded-full overflow-hidden flex shadow-inner transition-all">
+                        <div class="w-full text-center text-[10px] text-slate-400 leading-tight py-0.5 font-medium">発言データ待機中...</div>
+                    </div>
+                </div>
+
+                <!-- 詳細コンテンツ グリッド -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    
+                    <!-- 左カラム (2/3) -->
+                    <div class="lg:col-span-2 flex flex-col gap-5">
+                        <!-- 参加者ステータステーブル -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                            <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-3">
+                                <h3 class="font-bold text-slate-700 text-sm flex items-center gap-2">
+                                    <span>👥 参加者のリアルタイムステータス & 診断</span>
+                                </h3>
+                                <span class="text-[11px] text-slate-400 font-medium">1秒毎に同期</span>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-50 text-slate-500 uppercase tracking-wider border-b border-slate-100">
+                                            <th class="p-3 font-semibold rounded-l-lg">参加者</th>
+                                            <th class="p-3 font-semibold">発話状態</th>
+                                            <th class="p-3 font-semibold">視線先</th>
+                                            <th class="p-3 font-semibold">被注視</th>
+                                            <th class="p-3 font-semibold">累積発話 (シェア)</th>
+                                            <th class="p-3 font-semibold rounded-r-lg">リアルタイム診断</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="analysis-table-body" class="divide-y divide-slate-100">
+                                        <tr><td colspan="6" class="p-6 text-center text-slate-400 text-xs">参加者の接続を待機しています...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 発言量グラフ (Chart.js Bar) -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col min-h-[300px]">
+                            <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-3">
+                                <h3 class="font-bold text-slate-700 text-sm flex items-center gap-2">
+                                    <span>📊 参加者別 累積発話時間 (秒)</span>
+                                </h3>
+                            </div>
+                            <div class="flex-1 relative min-h-[220px]">
+                                <canvas id="speakingChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右カラム (1/3) -->
+                    <div class="flex flex-col gap-5">
+                        <!-- 発話シェア (Chart.js Doughnut) -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col h-[280px]">
+                            <div class="flex justify-between items-center border-b border-slate-100 pb-2 mb-2">
+                                <h3 class="font-bold text-slate-700 text-sm flex items-center gap-2">
+                                    <span>🥧 発話シェア</span>
+                                </h3>
+                            </div>
+                            <div class="flex-1 relative">
+                                <canvas id="talkShareChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- AIファシリテーション介入 & イベント履歴 -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex-1 flex flex-col min-h-[320px] max-h-[460px]">
+                            <div class="flex justify-between items-center border-b border-slate-100 pb-2 mb-3">
+                                <h3 class="font-bold text-slate-700 text-sm flex items-center gap-2">
+                                    <span>🤖 AI介入 & イベント履歴</span>
+                                </h3>
+                                <span id="event-count-badge" class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">0件</span>
+                            </div>
+                            <div id="ai-timeline" class="flex-1 overflow-y-auto pr-1 space-y-2.5">
+                                <div class="text-xs text-slate-400 text-center py-10">イベント履歴はまだありません</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- 通知用トースト (寂しいよ検知時) -->
+    <div id="toast-notification" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="bg-red-500 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-red-400">
+            <span class="text-2xl">🥺</span>
+            <div>
+                <div class="font-bold text-sm">「寂しいよ...」通知</div>
+                <div class="text-xs text-red-100">誰かが孤立やサポートを求めています</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let peer;
+        let hostConn;
+        let speakingChartInstance = null;
+        let talkShareChartInstance = null;
+        let lastReceivedTime = 0;
+        let connectionCheckInterval;
+        
+        let activeRoomCode = "";
+        let meetingElapsedSeconds = 0;
+        let cumulativeStats = {};
+        let currentUsers = [];
+        let sessionTimeline = [];
+        let lonelyEventsCount = 0;
+        let aiEventsLog = [];
+        
+        const defaultPalette = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#f97316', '#64748b'];
+
+        const connectScreen = document.getElementById('connect-screen');
+        const dashboardScreen = document.getElementById('dashboard-screen');
+        const btnText = document.getElementById('btn-text');
+        const errorMsg = document.getElementById('connection-error');
+        const codeInput = document.getElementById('join-code');
+
+        codeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') connectToHost();
+        });
+
+        function showError(msg) {
+            errorMsg.innerText = msg;
+            errorMsg.style.opacity = '1';
+            btnText.innerHTML = 'ホストに接続して監視開始';
+            document.getElementById('connect-btn').disabled = false;
+            setTimeout(() => errorMsg.style.opacity = '0', 4000);
+        }
+
+        // --- ホスト接続処理 ---
+        function connectToHost() {
+            const code = codeInput.value.trim().toUpperCase();
+            if (!code) return showError("招待コードを入力してください");
+            activeRoomCode = code;
+
+            btnText.innerHTML = '<span class="spinner"></span> 接続中...';
+            document.getElementById('connect-btn').disabled = true;
+
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const peerConfig = isLocal 
+                ? { host: window.location.hostname, port: 9000, path: '/peerjs', debug: 2 }
+                : { debug: 2 };
+
+            try {
+                peer = new Peer(null, peerConfig);
+            } catch(e) {
+                console.error("PeerJS creation error:", e);
+                peer = new Peer(null, { debug: 2 });
+            }
+
+            peer.on('open', (myId) => {
+                console.log('Dashboard Peer created, ID:', myId);
+                const targetId = `room-${code}`;
+                hostConn = peer.connect(targetId, { reliable: true });
+
+                hostConn.on('open', () => {
+                    console.log('Connected to host room:', targetId);
+                    // ダッシュボードとしての接続通知を送信
+                    hostConn.send({ type: 'join_as_dashboard', role: 'dashboard' });
+                    
+                    document.getElementById('display-room-code').innerText = code;
+                    connectScreen.classList.add('hidden');
+                    dashboardScreen.classList.remove('hidden');
+                    
+                    initCharts();
+                    startConnectionMonitor();
+                    addAiEventLog("システム接続", `ホストルーム [${code}] のリアルタイム監視を開始しました。`, "info");
+                });
+
+                hostConn.on('data', (data) => {
+                    handleHostData(data);
+                });
+
+                hostConn.on('close', () => {
+                    alert("ホストとの通信が切断されました。トップに戻ります。");
+                    location.reload();
+                });
+            });
+
+            peer.on('error', (err) => {
+                console.error('PeerJS error:', err);
+                if (err.type === 'peer-unavailable') {
+                    showError("ホストが見つかりません。コードを確認してください。");
+                } else {
+                    showError("通信エラー: " + err.type);
+                }
+            });
+        }
+
+        // --- 受信データハンドリング ---
+        function handleHostData(data) {
+            lastReceivedTime = Date.now();
+
+            if (data.type === 'analysis_stats_sync') {
+                meetingElapsedSeconds = data.elapsedSeconds || meetingElapsedSeconds;
+                cumulativeStats = data.cumulativeStats || cumulativeStats;
+                currentUsers = data.users || [];
+
+                recordTimelineLog(meetingElapsedSeconds, currentUsers);
+                updateDashboardUI();
+                checkAiDiagnosis(currentUsers);
+            } 
+            else if (data.type === 'lonely_alert') {
+                lonelyEventsCount++;
+                document.getElementById('kpi-lonely').innerHTML = `${lonelyEventsCount} <span class="text-xs font-normal text-slate-400">回</span>`;
+                showToastNotification();
+                addAiEventLog("🥺 寂しいよ発信", "誰かがサポート・発言機会を求めています（匿名発信）", "warning");
+            }
+            else if (data.type === 'personal_command' || data.type === 'parent_command') {
+                addAiEventLog("🤖 AI個別アドバイス", data.message || "個別指示が配信されました", "ai");
+            }
+            else if (data.type === 'dashboard_update') {
+                // 互換ハンドラ
+                if (data.stats) {
+                    cumulativeStats = data.stats.users || cumulativeStats;
+                }
+                updateDashboardUI();
+            }
+        }
+
+        // --- 時系列ログ記録 (1秒毎) ---
+        function recordTimelineLog(sec, users) {
+            const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+            const ss = String(sec % 60).padStart(2, '0');
+            const timeStr = `${mm}:${ss}`;
+
+            users.forEach(u => {
+                sessionTimeline.push({
+                    timestamp: timeStr,
+                    elapsedSec: sec,
+                    name: u.name,
+                    speaking: u.speaking ? 1 : 0,
+                    lookingAt: u.lookingAt || '正面',
+                    speakDuration: u.speakDuration || 0
+                });
+            });
+        }
+
+        // --- AI介入・診断の自動検出 & ログ記録 ---
+        let lastReportedIssues = {}; // key: userName, value: issueType
+        function checkAiDiagnosis(users) {
+            if (!users || users.length < 2) return;
+
+            const overSpeakers = users.filter(u => u.speakDuration >= 30);
+            const overLookers = users.filter(u => u.lookDuration >= 30 && u.lookingAt !== "正面");
+            
+            // 孤立判定
+            let isolatedUsers = [];
+            users.forEach(u => {
+                let isLookedAt = users.some(other => other.name !== u.name && other.lookingAt === u.name);
+                if (!isLookedAt && !u.speaking) {
+                    isolatedUsers.push(u.name);
+                }
+            });
+
+            users.forEach(u => {
+                let currentIssue = null;
+                let message = "";
+                let type = "ai";
+
+                if (u.speakDuration >= 30) {
+                    currentIssue = "over_speaking";
+                    message = `📢 [${u.name}] が30秒以上連続発言しています。他者へのパスを推奨。`;
+                    type = "warning";
+                } else if (u.lookDuration >= 30 && u.lookingAt !== "正面") {
+                    currentIssue = "over_looking";
+                    message = `⚠️ [${u.name}] が [${u.lookingAt}] さんを30秒以上注視しています。`;
+                    type = "warning";
+                } else if (isolatedUsers.includes(u.name)) {
+                    currentIssue = "isolated";
+                    message = `💡 [${u.name}] に視線が集まっておらず、発言もありません。発言の促しを推奨。`;
+                    type = "info";
+                }
+
+                if (currentIssue && lastReportedIssues[u.name] !== currentIssue) {
+                    lastReportedIssues[u.name] = currentIssue;
+                    addAiEventLog(u.name + " 診断検知", message, type);
+                } else if (!currentIssue) {
+                    delete lastReportedIssues[u.name];
+                }
+            });
+        }
+
+        function addAiEventLog(title, message, level = "info") {
+            const mm = String(Math.floor(meetingElapsedSeconds / 60)).padStart(2, '0');
+            const ss = String(meetingElapsedSeconds % 60).padStart(2, '0');
+            const timeStr = `${mm}:${ss}`;
+
+            aiEventsLog.unshift({ time: timeStr, title, message, level });
+            if (aiEventsLog.length > 50) aiEventsLog.pop();
+
+            const container = document.getElementById('ai-timeline');
+            document.getElementById('event-count-badge').innerText = `${aiEventsLog.length}件`;
+            
+            let html = '';
+            aiEventsLog.forEach(item => {
+                let borderClass = 'border-blue-200 bg-blue-50/50';
+                let tagColor = 'text-blue-600 bg-blue-100';
+                if (item.level === 'warning') {
+                    borderClass = 'border-amber-200 bg-amber-50/50';
+                    tagColor = 'text-amber-700 bg-amber-100';
+                } else if (item.level === 'ai') {
+                    borderClass = 'border-purple-200 bg-purple-50/50';
+                    tagColor = 'text-purple-700 bg-purple-100';
+                }
+
+                html += `
+                    <div class="p-3 rounded-xl border ${borderClass} text-xs transition-all">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-slate-700 flex items-center gap-1.5">
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${tagColor}">${item.time}</span>
+                                ${item.title}
+                            </span>
+                        </div>
+                        <p class="text-slate-600 leading-relaxed">${item.message}</p>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function showToastNotification() {
+            const toast = document.getElementById('toast-notification');
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+
+        // --- UI 更新ロジック ---
+        function updateDashboardUI() {
+            const users = currentUsers;
+            const userNames = users.map(u => u.name);
+
+            // 1. KPI更新
+            document.getElementById('kpi-users').innerHTML = `${users.length} <span class="text-xs font-normal text-slate-400">名</span>`;
+            
+            const mm = String(Math.floor(meetingElapsedSeconds / 60)).padStart(2, '0');
+            const ss = String(meetingElapsedSeconds % 60).padStart(2, '0');
+            document.getElementById('kpi-time').innerText = `${mm}:${ss}`;
+
+            let sumTotalSpeak = 0;
+            userNames.forEach(name => {
+                if (cumulativeStats[name]) {
+                    sumTotalSpeak += cumulativeStats[name].totalSpeakSeconds || 0;
+                }
+            });
+            const totalM = Math.floor(sumTotalSpeak / 60);
+            const totalS = sumTotalSpeak % 60;
+            const totalStr = `${totalM > 0 ? totalM + '分' : ''}${totalS}秒`;
+            document.getElementById('kpi-speak').innerText = totalStr;
+            document.getElementById('talk-ratio-summary').innerText = `総発話: ${totalStr}`;
+
+            // 2. 発話比率プログレスバー更新
+            const ratioBar = document.getElementById('talk-ratio-bar');
+            if (ratioBar) {
+                if (sumTotalSpeak === 0 || users.length === 0) {
+                    ratioBar.innerHTML = '<div class="w-full text-center text-[10px] text-slate-400 leading-tight py-0.5 font-medium">発言待機中...</div>';
+                } else {
+                    let barHtml = '';
+                    users.forEach((u, idx) => {
+                        const stat = cumulativeStats[u.name] || { totalSpeakSeconds: 0, color: defaultPalette[idx % defaultPalette.length] };
+                        const percent = ((stat.totalSpeakSeconds / sumTotalSpeak) * 100).toFixed(1);
+                        if (percent > 0) {
+                            barHtml += `<div style="width:${percent}%; background:${stat.color || defaultPalette[idx % defaultPalette.length]}; height:100%;" class="transition-all duration-300" title="${u.name}: ${percent}% (${stat.totalSpeakSeconds}秒)"></div>`;
+                        }
+                    });
+                    ratioBar.innerHTML = barHtml;
+                }
+            }
+
+            // 3. テーブル行の更新
+            const tableBody = document.getElementById('analysis-table-body');
+            if (users.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400 text-xs">参加者を待機しています...</td></tr>';
+            } else {
+                let rowsHtml = '';
+                users.forEach((u, idx) => {
+                    const stat = cumulativeStats[u.name] || { totalSpeakSeconds: 0, color: defaultPalette[idx % defaultPalette.length] };
+                    const userColor = stat.color || defaultPalette[idx % defaultPalette.length];
+                    const percent = sumTotalSpeak > 0 ? ((stat.totalSpeakSeconds / sumTotalSpeak) * 100).toFixed(1) + '%' : '0%';
+                    const uM = Math.floor(stat.totalSpeakSeconds / 60);
+                    const uS = stat.totalSpeakSeconds % 60;
+                    const uStr = `${uM > 0 ? uM + '分' : ''}${uS}秒`;
+
+                    // 発話状態バッジ
+                    let speakBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-500">静止</span>';
+                    if (u.speaking) {
+                        speakBadge = `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-600 border border-red-200"><span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>🗣️ 発話中 (${u.speakDuration || 0}s)</span>`;
+                    }
+
+                    // 被注視数
+                    const lookedByCount = users.filter(other => other.name !== u.name && other.lookingAt === u.name).length;
+                    const lookedByBadge = lookedByCount === 0 
+                        ? '<span class="text-rose-500 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-200">0人 (なし)</span>' 
+                        : `<span class="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">${lookedByCount}人</span>`;
+
+                    // リアルタイム診断
+                    let diagBadge = '<span class="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">✨ 良好</span>';
+                    if (u.speakDuration >= 30) {
+                        diagBadge = '<span class="text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-200">📢 30s超過</span>';
+                    } else if (u.lookDuration >= 30 && u.lookingAt !== "正面") {
+                        diagBadge = '<span class="text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">⚠️ 視線固定</span>';
+                    } else if (lookedByCount === 0 && !u.speaking) {
+                        diagBadge = '<span class="text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded border border-orange-200">💡 孤立気味</span>';
+                    }
+
+                    rowsHtml += `
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="p-3 font-bold text-slate-800 flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style="background-color: ${userColor};"></span>
+                                <span>${u.name}</span>
+                            </td>
+                            <td class="p-3">${speakBadge}</td>
+                            <td class="p-3 font-medium text-blue-600">${u.lookingAt || '正面'}</td>
+                            <td class="p-3">${lookedByBadge}</td>
+                            <td class="p-3 font-semibold text-slate-700 font-mono">${uStr} <span class="text-slate-400 text-[11px] font-normal">(${percent})</span></td>
+                            <td class="p-3">${diagBadge}</td>
+                        </tr>
+                    `;
+                });
+                tableBody.innerHTML = rowsHtml;
+            }
+
+            // 4. チャート更新
+            if (speakingChartInstance && talkShareChartInstance) {
+                const labels = userNames;
+                const dataValues = userNames.map(name => cumulativeStats[name] ? cumulativeStats[name].totalSpeakSeconds : 0);
+                const colors = userNames.map((name, idx) => (cumulativeStats[name] && cumulativeStats[name].color) ? cumulativeStats[name].color : defaultPalette[idx % defaultPalette.length]);
+
+                // 棒グラフ
+                speakingChartInstance.data.labels = labels;
+                speakingChartInstance.data.datasets[0].data = dataValues;
+                speakingChartInstance.data.datasets[0].backgroundColor = colors;
+                speakingChartInstance.update();
+
+                // ドーナツグラフ
+                if (sumTotalSpeak > 0) {
+                    talkShareChartInstance.data.labels = labels;
+                    talkShareChartInstance.data.datasets[0].data = dataValues;
+                    talkShareChartInstance.data.datasets[0].backgroundColor = colors;
+                } else {
+                    talkShareChartInstance.data.labels = ['発話待機中'];
+                    talkShareChartInstance.data.datasets[0].data = [1];
+                    talkShareChartInstance.data.datasets[0].backgroundColor = ['#e2e8f0'];
+                }
+                talkShareChartInstance.update();
+            }
+        }
+
+        // --- Chart.js 初期化 ---
+        function initCharts() {
+            const ctxSpeak = document.getElementById('speakingChart').getContext('2d');
+            speakingChartInstance = new Chart(ctxSpeak, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '累積発言時間 (秒)',
+                        data: [],
+                        backgroundColor: defaultPalette,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `発言時間: ${context.parsed.y}秒 (${Math.floor(context.parsed.y / 60)}分${context.parsed.y % 60}秒)`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, border: { display: false } },
+                        x: { grid: { display: false }, border: { display: false } }
+                    },
+                    animation: { duration: 300 }
+                }
+            });
+
+            const ctxShare = document.getElementById('talkShareChart').getContext('2d');
+            talkShareChartInstance = new Chart(ctxShare, {
+                type: 'doughnut',
+                data: {
+                    labels: ['発話待機中'],
+                    datasets: [{
+                        data: [1],
+                        backgroundColor: ['#e2e8f0'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { boxWidth: 12, padding: 12, font: { family: "'Inter', sans-serif", size: 11 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => ` ${context.label}: ${context.parsed}秒`
+                            }
+                        }
+                    },
+                    cutout: '68%',
+                    animation: { duration: 300 }
+                }
+            });
+        }
+
+        // --- 接続状態モニター ---
+        function startConnectionMonitor() {
+            const indicator = document.getElementById('live-indicator');
+            connectionCheckInterval = setInterval(() => {
+                if (Date.now() - lastReceivedTime > 5000 && lastReceivedTime > 0) {
+                    indicator.className = "flex items-center gap-1.5 text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 text-xs font-semibold";
+                    indicator.innerHTML = '<span class="w-2 h-2 rounded-full bg-slate-400"></span> 待機中 (接続不安定)';
+                } else if (lastReceivedTime > 0) {
+                    indicator.className = "flex items-center gap-1.5 text-green-700 bg-green-50 px-2.5 py-0.5 rounded-full border border-green-200 text-xs font-semibold";
+                    indicator.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> LIVE 接続中';
+                }
+            }, 2000);
+        }
+
+        // --- CSV エクスポート機能 (index.html 完全準拠) ---
+        function downloadAnalysisCSV() {
+            const hasData = sessionTimeline.length > 0 || Object.keys(cumulativeStats).length > 0;
+            if (!hasData) {
+                return alert("まだ分析データが蓄積されていません。ホストに接続し、会話を開始してからダウンロードしてください。");
+            }
+
+            const now = new Date();
+            const dateStr = now.getFullYear() + 
+                String(now.getMonth() + 1).padStart(2, '0') + 
+                String(now.getDate()).padStart(2, '0') + "_" + 
+                String(now.getHours()).padStart(2, '0') + 
+                String(now.getMinutes()).padStart(2, '0');
+
+            let csvContent = "\uFEFF"; // UTF-8 BOM for Excel
+
+            csvContent += "=== 会話分析サマリー ===\n";
+            csvContent += `ルームコード,${activeRoomCode}\n`;
+            csvContent += `合計経過時間(秒),${meetingElapsedSeconds}\n\n`;
+
+            csvContent += "参加者名,累積発話時間(秒),累積発話時間(分秒),発話比率(%),最終被注視数\n";
+            const users = currentUsers;
+            let sumTotalSpeak = 0;
+            Object.keys(cumulativeStats).forEach(name => sumTotalSpeak += (cumulativeStats[name].totalSpeakSeconds || 0));
+
+            Object.keys(cumulativeStats).forEach(name => {
+                const stat = cumulativeStats[name];
+                const sec = stat.totalSpeakSeconds || 0;
+                const minSec = `${Math.floor(sec / 60)}分${sec % 60}秒`;
+                const percent = sumTotalSpeak > 0 ? ((sec / sumTotalSpeak) * 100).toFixed(1) + "%" : "0%";
+                const u = users.find(x => x.name === name);
+                const lookedBy = u ? users.filter(o => o.name !== name && o.lookingAt === name).length : "N/A";
+                csvContent += `"${name}",${sec},"${minSec}",${percent},${lookedBy}\n`;
+            });
+
+            csvContent += "\n=== 時系列タイムラインログ (1秒毎) ===\n";
+            csvContent += "経過時間,経過秒,参加者名,発話フラグ(1/0),視線先,連続発話秒数\n";
+            sessionTimeline.forEach(row => {
+                csvContent += `"${row.timestamp}",${row.elapsedSec},"${row.name}",${row.speaking},"${row.lookingAt}",${row.speakDuration}\n`;
+            });
+
+            csvContent += "\n=== AIファシリテーション介入・イベント履歴 ===\n";
+            csvContent += "発生時刻,タイトル,内容,重要度\n";
+            aiEventsLog.forEach(row => {
+                csvContent += `"${row.time}","${row.title}","${row.message}","${row.level}"\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `meeting_analysis_${activeRoomCode}_${dateStr}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
