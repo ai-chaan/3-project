@@ -33,6 +33,14 @@
         .seat.selectable.selected { background: #e67e22; border: 2px solid #d35400; transform: scale(1.1); box-shadow: 0 0 10px #e67e22; }
         .seat-label { position: absolute; bottom: -22px; width: 100px; left: -28px; color: #333; text-align: center; font-size: 12px; font-weight: bold; white-space: nowrap; text-shadow: 0 0 3px white;}
         .info-tip { font-size: 13px; color: #555; background: #e8f4f8; padding: 10px; border-radius: 5px; border-left: 4px solid #3498db; margin-bottom: 10px;}
+        .analysis-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 560px; text-align: left; margin: 0 auto;}
+        .analysis-table th, .analysis-table td { padding: 8px 6px; border-bottom: 1px solid #f0f0f0; }
+        .badge-speaking { background: #e74c3c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+        .badge-idle { background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+        .badge-listening { background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+        .badge-ok { color: #27ae60; font-weight: bold; }
+        .badge-warn { color: #e67e22; font-weight: bold; }
+        .badge-alert { color: #e74c3c; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -106,6 +114,46 @@
             <div class="global-alert" id="parent-command-alert">AIが会話のバランスを分析中です...</div>
 
             <button class="lonely-btn" id="lonely-trigger" onclick="sendLonelyAlert()">寂しいよ...</button>
+        </div>
+
+        <!-- ★ 全員のリアルタイム分析ダッシュボード ★ -->
+        <div class="analysis-card" id="analysis-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: #2c3e50;">📈 全員のリアルタイム分析</h3>
+                <span id="meeting-timer" style="font-size: 14px; font-weight: bold; background: #e8f4f8; color: #2980b9; padding: 4px 8px; border-radius: 4px;">経過: 00:00</span>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #7f8c8d;">
+                    <span>🗣️ 発言バランス比率</span>
+                    <span id="total-talk-time-label">総発言: 0秒</span>
+                </div>
+                <div id="talk-ratio-bar" style="height: 14px; background: #eee; border-radius: 7px; overflow: hidden; display: flex;">
+                    <div style="width: 100%; text-align: center; font-size: 10px; color: #999; line-height: 14px;">発言待機中</div>
+                </div>
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table class="analysis-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="background: #f8f9fa; color: #555; text-align: left; border-bottom: 2px solid #eee;">
+                            <th style="padding: 6px;">参加者</th>
+                            <th style="padding: 6px;">発話状態</th>
+                            <th style="padding: 6px;">視線先</th>
+                            <th style="padding: 6px;">被注視</th>
+                            <th style="padding: 6px;">累積発話 (比率)</th>
+                            <th style="padding: 6px;">診断</th>
+                        </tr>
+                    </thead>
+                    <tbody id="analysis-table-body">
+                        <tr><td colspan="6" style="text-align:center; color:#999; padding:15px;">データを収集中です...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <button onclick="downloadAnalysisCSV()" style="margin-top: 15px; background: #27ae60; font-size: 14px; padding: 10px 15px;">
+                📥 会話分析データ(CSV)をダウンロード
+            </button>
         </div>
     </div>
 
@@ -250,6 +298,7 @@
 
             initPeerJS();
             startDurationTimer();
+            startMeetingAnalysisTimer();
             await initAudio();
             initFaceMesh();
         }
@@ -302,6 +351,7 @@
             document.getElementById('role-badge').innerText = `ルーム: ${activeRoomCode} (👤 ゲスト: ${myName})`;
 
             startDurationTimer();
+            startMeetingAnalysisTimer();
             await initAudio();
             initFaceMesh();
         }
@@ -475,12 +525,201 @@
                     if (el) el.innerText = msg.message;
                 }
             }
+            else if (msg.type === 'analysis_stats_sync') {
+                meetingElapsedSeconds = msg.elapsedSeconds;
+                const mm = String(Math.floor(meetingElapsedSeconds / 60)).padStart(2, '0');
+                const ss = String(meetingElapsedSeconds % 60).padStart(2, '0');
+                const timerEl = document.getElementById('meeting-timer');
+                if (timerEl) timerEl.innerText = `経過: ${mm}:${ss}`;
+                cumulativeStats = msg.cumulativeStats || {};
+                renderAnalysisDashboard(msg.users || []);
+            }
             else if (msg.type === 'lonely_alert') {
                 if (myRole === 'parent') {
                     broadcastToGuests(msg, msg.fromPeerId);
                 }
                 showLonelyOverlay();
             }
+        }
+
+        // ==========================================
+        // ★ 📊 リアルタイム分析 & データ集計実装 ★
+        // ==========================================
+        let meetingElapsedSeconds = 0;
+        let cumulativeStats = {}; // { [userName]: { totalSpeakSeconds: 0, color: string } }
+        let sessionTimeline = []; // 時系列ログ [{ timestamp, elapsedSec, name, speaking, lookingAt, speakDuration }]
+        const userColors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#d35400', '#34495e'];
+
+        function startMeetingAnalysisTimer() {
+            setInterval(() => {
+                meetingElapsedSeconds++;
+                const mm = String(Math.floor(meetingElapsedSeconds / 60)).padStart(2, '0');
+                const ss = String(meetingElapsedSeconds % 60).padStart(2, '0');
+                const timerEl = document.getElementById('meeting-timer');
+                if (timerEl) timerEl.innerText = `経過: ${mm}:${ss}`;
+
+                if (myRole === 'parent') {
+                    const users = Object.values(hostGlobalState);
+                    users.forEach((u, idx) => {
+                        if (!cumulativeStats[u.name]) {
+                            cumulativeStats[u.name] = { 
+                                totalSpeakSeconds: 0, 
+                                color: userColors[idx % userColors.length] 
+                            };
+                        }
+                        if (u.speaking) {
+                            cumulativeStats[u.name].totalSpeakSeconds++;
+                        }
+                        sessionTimeline.push({
+                            timestamp: `${mm}:${ss}`,
+                            elapsedSec: meetingElapsedSeconds,
+                            name: u.name,
+                            speaking: u.speaking ? 1 : 0,
+                            lookingAt: u.lookingAt || '正面',
+                            speakDuration: u.speakDuration || 0
+                        });
+                    });
+
+                    renderAnalysisDashboard(users);
+
+                    broadcastToGuests({
+                        type: 'analysis_stats_sync',
+                        elapsedSeconds: meetingElapsedSeconds,
+                        cumulativeStats: cumulativeStats,
+                        users: users
+                    });
+                }
+            }, 1000);
+        }
+
+        function renderAnalysisDashboard(users) {
+            const tableBody = document.getElementById('analysis-table-body');
+            const ratioBar = document.getElementById('talk-ratio-bar');
+            const totalTalkLabel = document.getElementById('total-talk-time-label');
+            if (!tableBody || !users || users.length === 0) return;
+
+            let sumTotalSpeak = 0;
+            users.forEach(u => {
+                const stat = cumulativeStats[u.name];
+                if (stat) sumTotalSpeak += stat.totalSpeakSeconds;
+            });
+            if (totalTalkLabel) {
+                const totalM = Math.floor(sumTotalSpeak / 60);
+                const totalS = sumTotalSpeak % 60;
+                totalTalkLabel.innerText = `総発話: ${totalM > 0 ? totalM + '分' : ''}${totalS}秒`;
+            }
+
+            // 発話比率バー
+            if (ratioBar) {
+                if (sumTotalSpeak === 0) {
+                    ratioBar.innerHTML = '<div style="width:100%; text-align:center; font-size:10px; color:#999; line-height:14px;">発言待機中</div>';
+                } else {
+                    let barHtml = '';
+                    users.forEach((u, idx) => {
+                        const stat = cumulativeStats[u.name] || { totalSpeakSeconds: 0, color: userColors[idx % userColors.length] };
+                        const percent = ((stat.totalSpeakSeconds / sumTotalSpeak) * 100).toFixed(1);
+                        if (percent > 0) {
+                            barHtml += `<div style="width:${percent}%; background:${stat.color}; height:100%;" title="${u.name}: ${percent}% (${stat.totalSpeakSeconds}秒)"></div>`;
+                        }
+                    });
+                    ratioBar.innerHTML = barHtml;
+                }
+            }
+
+            // テーブル行
+            let rowsHtml = '';
+            users.forEach((u, idx) => {
+                const stat = cumulativeStats[u.name] || { totalSpeakSeconds: 0, color: userColors[idx % userColors.length] };
+                const percent = sumTotalSpeak > 0 ? ((stat.totalSpeakSeconds / sumTotalSpeak) * 100).toFixed(1) + '%' : '0%';
+                const totalM = Math.floor(stat.totalSpeakSeconds / 60);
+                const totalS = stat.totalSpeakSeconds % 60;
+                const totalStr = `${totalM > 0 ? totalM + '分' : ''}${totalS}秒`;
+
+                // 発話状態バッジ
+                let speakBadge = '<span class="badge-idle">静止</span>';
+                if (u.speaking) {
+                    speakBadge = `<span class="badge-speaking">🗣️ 発話中 (${u.speakDuration || 0}s)</span>`;
+                }
+
+                // 被注視数
+                const lookedByCount = users.filter(other => other.name !== u.name && other.lookingAt === u.name).length;
+                const lookedByStr = lookedByCount === 0 
+                    ? '<span style="color:#e74c3c; font-weight:bold;">0人 (なし)</span>' 
+                    : `<span style="color:#27ae60; font-weight:bold;">${lookedByCount}人</span>`;
+
+                // 診断
+                let diagStr = '<span class="badge-ok">✨ 良好</span>';
+                if (u.speakDuration >= 30) {
+                    diagStr = '<span class="badge-alert">📢 30s超過</span>';
+                } else if (u.lookDuration >= 30 && u.lookingAt !== "正面") {
+                    diagStr = '<span class="badge-warn">⚠️ 視線固定</span>';
+                } else if (lookedByCount === 0 && !u.speaking) {
+                    diagStr = '<span class="badge-warn" style="color:#e67e22;">💡 孤立気味</span>';
+                }
+
+                rowsHtml += `
+                    <tr>
+                        <td style="padding:6px; font-weight:bold;">
+                            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${stat.color}; margin-right:5px;"></span>
+                            ${u.name}
+                        </td>
+                        <td style="padding:6px;">${speakBadge}</td>
+                        <td style="padding:6px; color:#2980b9;">${u.lookingAt || '正面'}</td>
+                        <td style="padding:6px;">${lookedByStr}</td>
+                        <td style="padding:6px;"><b>${totalStr}</b> <span style="font-size:11px; color:#7f8c8d;">(${percent})</span></td>
+                        <td style="padding:6px;">${diagStr}</td>
+                    </tr>
+                `;
+            });
+            tableBody.innerHTML = rowsHtml;
+        }
+
+        // CSVエクスポート
+        function downloadAnalysisCSV() {
+            const hasData = sessionTimeline.length > 0 || Object.keys(cumulativeStats).length > 0;
+            if (!hasData) {
+                return alert("まだ分析データが蓄積されていません。システムを開始して会話を行ってからダウンロードしてください。");
+            }
+
+            const now = new Date();
+            const dateStr = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + "_" + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
+
+            let csvContent = "\uFEFF"; // UTF-8 BOM for Excel
+
+            csvContent += "=== 会話分析サマリー ===\n";
+            csvContent += `ルームコード,${activeRoomCode}\n`;
+            csvContent += `合計経過時間(秒),${meetingElapsedSeconds}\n\n`;
+
+            csvContent += "参加者名,累積発話時間(秒),累積発話時間(分秒),発話比率(%),最終被注視数\n";
+            const users = myRole === 'parent' ? Object.values(hostGlobalState) : [];
+            let sumTotalSpeak = 0;
+            Object.keys(cumulativeStats).forEach(name => sumTotalSpeak += cumulativeStats[name].totalSpeakSeconds);
+
+            Object.keys(cumulativeStats).forEach(name => {
+                const stat = cumulativeStats[name];
+                const sec = stat.totalSpeakSeconds;
+                const minSec = `${Math.floor(sec / 60)}分${sec % 60}秒`;
+                const percent = sumTotalSpeak > 0 ? ((sec / sumTotalSpeak) * 100).toFixed(1) + "%" : "0%";
+                const u = users.find(x => x.name === name);
+                const lookedBy = u ? users.filter(o => o.name !== name && o.lookingAt === name).length : "N/A";
+                csvContent += `"${name}",${sec},"${minSec}",${percent},${lookedBy}\n`;
+            });
+
+            csvContent += "\n=== 時系列タイムラインログ (1秒毎) ===\n";
+            csvContent += "経過時間,経過秒,参加者名,発話フラグ(1/0),視線先,連続発話秒数\n";
+            sessionTimeline.forEach(row => {
+                csvContent += `"${row.timestamp}",${row.elapsedSec},"${row.name}",${row.speaking},"${row.lookingAt}",${row.speakDuration}\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `meeting_analysis_${dateStr}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         function broadcastToGuests(msgObj, excludePeerId = null) {
