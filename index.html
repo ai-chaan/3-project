@@ -36,6 +36,13 @@
         .seat.selectable.selected { background: #e67e22; border: 2px solid #d35400; transform: scale(1.1); box-shadow: 0 0 10px #e67e22; }
         .seat-label { position: absolute; bottom: -22px; width: 100px; left: -28px; color: #333; text-align: center; font-size: 12px; font-weight: bold; white-space: nowrap; text-shadow: 0 0 3px white;}
         .info-tip { font-size: 13px; color: #555; background: #e8f4f8; padding: 10px; border-radius: 5px; border-left: 4px solid #3498db; margin-bottom: 10px;}
+        .option-card-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+        .option-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; transition: border-color 0.15s, background 0.15s; width: auto; margin-top: 0; }
+        .option-card:hover { border-color: #90caf0; }
+        .option-card:has(input:checked) { border-color: #3498db; background: #eaf4fc; }
+        .option-card input[type="radio"] { width: 18px; height: 18px; margin: 0; flex-shrink: 0; }
+        .option-card .option-title { font-weight: bold; font-size: 14px; color: #2c3e50; }
+        .option-card .option-desc { font-size: 12px; color: #7f8c8d; }
         .analysis-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; text-align: left; box-sizing: border-box; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
         .analysis-table th, .analysis-table td { padding: 8px 6px; border-bottom: 1px solid #f0f0f0; }
         .badge-speaking { background: #e74c3c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
@@ -77,8 +84,32 @@
                     </div>
                     <div id="seat-map"></div>
 
-                    <div style="margin-top: 15px;">
-                        <label><input type="checkbox" id="show-analysis-setting" checked style="width:auto; margin-right:6px;"> 📈 全員の分析ダッシュボードを表示する（全端末に反映）</label>
+                    <h3 style="margin-top:15px; margin-bottom:5px;">📈 分析ダッシュボードの見せ方</h3>
+                    <div class="option-card-group" id="analysis-display-mode-group">
+                        <label class="option-card">
+                            <input type="radio" name="analysis-display-mode" value="full" checked>
+                            <span><span class="option-title">📊 くわしく見る</span><br><span class="option-desc">表・グラフ・CSV保存まで全部使う</span></span>
+                        </label>
+                        <label class="option-card">
+                            <input type="radio" name="analysis-display-mode" value="simple">
+                            <span><span class="option-title">📈 かんたんに見る</span><br><span class="option-desc">発言バランスのバーだけ、パッと見られる</span></span>
+                        </label>
+                        <label class="option-card">
+                            <input type="radio" name="analysis-display-mode" value="hidden">
+                            <span><span class="option-title">🚫 見せない</span><br><span class="option-desc">分析ダッシュボードを表示しない</span></span>
+                        </label>
+                    </div>
+
+                    <h3 style="margin-top:15px; margin-bottom:5px;">👀 だれに見せる？</h3>
+                    <div class="option-card-group" id="analysis-visibility-scope-group">
+                        <label class="option-card">
+                            <input type="radio" name="analysis-visibility-scope" value="all" checked>
+                            <span><span class="option-title">👥 みんなに見せる</span><br><span class="option-desc">参加者全員の画面に表示する</span></span>
+                        </label>
+                        <label class="option-card">
+                            <input type="radio" name="analysis-visibility-scope" value="host">
+                            <span><span class="option-title">👑 自分だけ見る</span><br><span class="option-desc">親機の画面にだけ表示（子機には出さない）</span></span>
+                        </label>
                     </div>
 
                     <button onclick="startHostSystem()">親機としてシステム開始</button>
@@ -130,7 +161,7 @@
                     </div>
                 </div>
 
-                <div style="overflow-x: auto;">
+                <div id="analysis-table-wrapper" style="overflow-x: auto;">
                     <table class="analysis-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
                         <thead>
                             <tr style="background: #f8f9fa; color: #555; text-align: left; border-bottom: 2px solid #eee;">
@@ -148,7 +179,7 @@
                     </table>
                 </div>
 
-                <button onclick="downloadAnalysisCSV()" style="margin-top: 15px; background: #27ae60; font-size: 14px; padding: 10px 15px;">
+                <button id="analysis-csv-btn" onclick="downloadAnalysisCSV()" style="margin-top: 15px; background: #27ae60; font-size: 14px; padding: 10px 15px;">
                     📥 会話分析データ(CSV)をダウンロード
                 </button>
             </div>
@@ -169,7 +200,9 @@
 
     <script>
         let myName = "", myRole = "child", activeRoomCode = "";
-        let showAnalysisPanel = true; // ホストが設定する分析ダッシュボード表示設定（全端末に同期）
+        // ホストが設定する分析ダッシュボード表示設定（全端末に同期）
+        let analysisDisplayMode = 'full';   // 'full' | 'simple' | 'hidden'
+        let analysisVisibilityScope = 'all'; // 'all' | 'host'
         let isSpeaking = false, currentLookTarget = "正面", currentFaceRatio = 0.5;
         let speakDurationSeconds = 0, lookDurationSeconds = 0, lastLookTarget = "正面";
         let registeredTargets = [{ name: "正面", ratio: 0.5 }];
@@ -192,10 +225,24 @@
             document.getElementById('guest-panel').style.display = mode === 'guest' ? 'block' : 'none';
         }
 
-        // ホストが設定した分析ダッシュボード表示設定を自分の画面に適用
+        // ホストが設定した分析ダッシュボード表示パターン・表示範囲を自分の画面に適用
         function applyAnalysisPanelVisibility() {
             const panel = document.getElementById('analysis-panel');
-            if (panel) panel.style.display = showAnalysisPanel ? 'block' : 'none';
+            if (!panel) return;
+
+            // 表示範囲: 親機のみ設定の場合、子機では常に非表示
+            const isVisibleForMyRole = analysisVisibilityScope === 'all' || myRole === 'parent';
+            const isHidden = analysisDisplayMode === 'hidden' || !isVisibleForMyRole;
+
+            panel.style.display = isHidden ? 'none' : 'block';
+            if (isHidden) return;
+
+            // 表示パターン: シンプル表示では詳細テーブルとCSVボタンを隠す
+            const isSimple = analysisDisplayMode === 'simple';
+            const tableWrapper = document.getElementById('analysis-table-wrapper');
+            const csvBtn = document.getElementById('analysis-csv-btn');
+            if (tableWrapper) tableWrapper.style.display = isSimple ? 'none' : 'block';
+            if (csvBtn) csvBtn.style.display = isSimple ? 'none' : 'block';
         }
 
         // --- ホスト用座席配置マップレンダリング & ドラッグ実装 ---
@@ -307,7 +354,8 @@
             hostSeat.name = document.getElementById('host-my-name').value.trim() || "ホスト";
             myName = hostSeat.name;
 
-            showAnalysisPanel = document.getElementById('show-analysis-setting').checked;
+            analysisDisplayMode = document.querySelector('input[name="analysis-display-mode"]:checked').value;
+            analysisVisibilityScope = document.querySelector('input[name="analysis-visibility-scope"]:checked').value;
             applyAnalysisPanelVisibility();
 
             setupRegisteredTargetsFor(hostSeat, masterSeats);
@@ -476,7 +524,7 @@
 
         function broadcastSeatsToGuests() {
             if (myRole !== 'parent') return;
-            const msg = { type: 'room_seats_sync', seats: masterSeats, showAnalysisPanel: showAnalysisPanel };
+            const msg = { type: 'room_seats_sync', seats: masterSeats, analysisDisplayMode: analysisDisplayMode, analysisVisibilityScope: analysisVisibilityScope };
             broadcastToGuests(msg);
         }
 
@@ -488,7 +536,7 @@
                     updateConnectionStatus(`🟢 ゲスト接続中 (${Object.keys(connections).length}名)`);
                     
                     // 接続されたゲストへ最新の座席マップと分析ダッシュボード表示設定を送信
-                    conn.send({ type: 'room_seats_sync', seats: masterSeats, showAnalysisPanel: showAnalysisPanel });
+                    conn.send({ type: 'room_seats_sync', seats: masterSeats, analysisDisplayMode: analysisDisplayMode, analysisVisibilityScope: analysisVisibilityScope });
                 });
                 conn.on('data', (data) => handleIncomingData(data));
                 conn.on('close', () => {
@@ -521,8 +569,9 @@
                 if (myRole === 'child') {
                     masterSeats = msg.seats;
                     renderGuestSeatSelectMap();
-                    if (typeof msg.showAnalysisPanel === 'boolean') {
-                        showAnalysisPanel = msg.showAnalysisPanel;
+                    if (msg.analysisDisplayMode) {
+                        analysisDisplayMode = msg.analysisDisplayMode;
+                        analysisVisibilityScope = msg.analysisVisibilityScope || 'all';
                         applyAnalysisPanelVisibility();
                     }
                     // 既にスタート後ならターゲット比率を再計算
