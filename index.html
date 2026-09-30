@@ -48,8 +48,7 @@
         .option-card .option-title { font-weight: bold; font-size: 14px; color: #2c3e50; }
         .option-card .option-desc { font-size: 12px; color: #7f8c8d; }
         .analysis-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; text-align: left; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-        .analysis-table { min-width: 480px; }
-        .analysis-table th, .analysis-table td { padding: 8px 6px; border-bottom: 1px solid #f0f0f0; }
+        .analysis-person-card { border: 1px solid #eee; border-radius: 8px; padding: 10px 12px; }
         .badge-speaking { background: #e74c3c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
         .badge-idle { background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
         .badge-listening { background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
@@ -186,22 +185,10 @@
                     </div>
                 </div>
 
-                <div id="analysis-table-wrapper" style="overflow-x: auto;">
-                    <table class="analysis-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
-                        <thead>
-                            <tr style="background: #f8f9fa; color: #555; text-align: left; border-bottom: 2px solid #eee;">
-                                <th style="padding: 6px;">参加者</th>
-                                <th style="padding: 6px;">発話状態</th>
-                                <th style="padding: 6px;">視線先</th>
-                                <th style="padding: 6px;">被注視</th>
-                                <th style="padding: 6px;">累積発話 (比率)</th>
-                                <th style="padding: 6px;">診断</th>
-                            </tr>
-                        </thead>
-                        <tbody id="analysis-table-body">
-                            <tr><td colspan="6" style="text-align:center; color:#999; padding:15px;">データを収集中です...</td></tr>
-                        </tbody>
-                    </table>
+                <div id="analysis-detail-wrapper">
+                    <div id="analysis-cards" style="display: flex; flex-direction: column; gap: 8px;">
+                        <div style="text-align:center; color:#999; padding:15px; font-size:13px;">データを収集中です...</div>
+                    </div>
                 </div>
 
                 <button id="analysis-csv-btn" onclick="downloadAnalysisCSV()" style="margin-top: 15px; background: #27ae60; font-size: 14px; padding: 10px 15px;">
@@ -262,11 +249,11 @@
             panel.style.display = isHidden ? 'none' : 'block';
             if (isHidden) return;
 
-            // 表示パターン: シンプル表示では詳細テーブルとCSVボタンを隠す
+            // 表示パターン: シンプル表示では詳細カードとCSVボタンを隠す
             const isSimple = analysisDisplayMode === 'simple';
-            const tableWrapper = document.getElementById('analysis-table-wrapper');
+            const detailWrapper = document.getElementById('analysis-detail-wrapper');
             const csvBtn = document.getElementById('analysis-csv-btn');
-            if (tableWrapper) tableWrapper.style.display = isSimple ? 'none' : 'block';
+            if (detailWrapper) detailWrapper.style.display = isSimple ? 'none' : 'block';
             if (csvBtn) csvBtn.style.display = isSimple ? 'none' : 'block';
         }
 
@@ -713,10 +700,10 @@
         }
 
         function renderAnalysisDashboard(users) {
-            const tableBody = document.getElementById('analysis-table-body');
+            const cardsContainer = document.getElementById('analysis-cards');
             const ratioBar = document.getElementById('talk-ratio-bar');
             const totalTalkLabel = document.getElementById('total-talk-time-label');
-            if (!tableBody || !users || users.length === 0) return;
+            if (!cardsContainer || !users || users.length === 0) return;
 
             let sumTotalSpeak = 0;
             users.forEach(u => {
@@ -746,11 +733,11 @@
                 }
             }
 
-            // テーブル行
-            let rowsHtml = '';
+            // 参加者カード
+            let cardsHtml = '';
             users.forEach((u, idx) => {
                 const stat = cumulativeStats[u.name] || { totalSpeakSeconds: 0, color: userColors[idx % userColors.length] };
-                const percent = sumTotalSpeak > 0 ? ((stat.totalSpeakSeconds / sumTotalSpeak) * 100).toFixed(1) + '%' : '0%';
+                const percent = sumTotalSpeak > 0 ? (stat.totalSpeakSeconds / sumTotalSpeak) * 100 : 0;
                 const totalM = Math.floor(stat.totalSpeakSeconds / 60);
                 const totalS = stat.totalSpeakSeconds % 60;
                 const totalStr = `${totalM > 0 ? totalM + '分' : ''}${totalS}秒`;
@@ -763,9 +750,6 @@
 
                 // 被注視数
                 const lookedByCount = users.filter(other => other.name !== u.name && other.lookingAt === u.name).length;
-                const lookedByStr = lookedByCount === 0 
-                    ? '<span style="color:#e74c3c; font-weight:bold;">0人 (なし)</span>' 
-                    : `<span style="color:#27ae60; font-weight:bold;">${lookedByCount}人</span>`;
 
                 // 診断
                 let diagStr = '<span class="badge-ok">✨ 良好</span>';
@@ -777,21 +761,26 @@
                     diagStr = '<span class="badge-warn" style="color:#e67e22;">💡 孤立気味</span>';
                 }
 
-                rowsHtml += `
-                    <tr>
-                        <td style="padding:6px; font-weight:bold;">
-                            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${stat.color}; margin-right:5px;"></span>
-                            ${u.name}
-                        </td>
-                        <td style="padding:6px;">${speakBadge}</td>
-                        <td style="padding:6px; color:#2980b9;">${u.lookingAt || '正面'}</td>
-                        <td style="padding:6px;">${lookedByStr}</td>
-                        <td style="padding:6px;"><b>${totalStr}</b> <span style="font-size:11px; color:#7f8c8d;">(${percent})</span></td>
-                        <td style="padding:6px;">${diagStr}</td>
-                    </tr>
+                cardsHtml += `
+                    <div class="analysis-person-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <span style="font-weight:bold; font-size:14px; color:#2c3e50;">
+                                <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${stat.color}; margin-right:5px;"></span>${u.name}
+                            </span>
+                            ${speakBadge}
+                        </div>
+                        <div style="height:8px; background:#eee; border-radius:4px; overflow:hidden; margin-bottom:6px;">
+                            <div style="width:${percent}%; height:100%; background:${stat.color};"></div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#7f8c8d; margin-bottom:2px;">
+                            <span><b>${totalStr}</b> (${percent.toFixed(1)}%)</span>
+                            ${diagStr}
+                        </div>
+                        <div style="font-size:12px; color:#7f8c8d;">視線:${u.lookingAt || '正面'}・被注視:${lookedByCount}人</div>
+                    </div>
                 `;
             });
-            tableBody.innerHTML = rowsHtml;
+            cardsContainer.innerHTML = cardsHtml;
         }
 
         // CSVエクスポート
