@@ -9,18 +9,18 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         * { box-sizing: border-box; }
-        html, body { height: 100%; }
-        body { font-family: sans-serif; text-align: center; background-color: #f4f7f6; margin: 0; padding: 10px 12px; }
+        body { font-family: sans-serif; text-align: center; background-color: #f4f7f6; margin: 0; padding: 20px 12px; }
         h1 { font-size: 26px; }
-        .setup-box { background: white; padding: 20px; border-radius: 10px; margin: 0 auto 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 820px; text-align: left; max-height: calc(100vh - 40px); overflow-y: auto; }
+        .setup-box { background: white; padding: 20px; border-radius: 10px; margin: 0 auto 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 420px; text-align: left;}
         .host-settings-columns { display: flex; gap: 25px; align-items: flex-start; flex-wrap: wrap; }
-        .host-col { flex: 1 1 340px; min-width: 280px; }
-        .main-container { display: flex; justify-content: center; align-items: flex-start; gap: 20px; flex-wrap: nowrap; height: calc(100vh - 70px); }
-        .camera-column { display: flex; flex-direction: column; gap: 15px; width: 340px; height: 100%; flex-shrink: 0; order: 2; }
+        .host-col { flex: 1 1 100%; min-width: 0; }
+        .main-container { display: flex; justify-content: center; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
+        .camera-column { display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 340px; margin: 0 auto; order: 2; }
+        .dashboard { order: 1; }
         .video-box { position: relative; width: 100%; flex-shrink: 0; }
         video { display: none; }
         canvas { border: 2px solid #333; border-radius: 8px; transform: scaleX(-1); width: 100%; height: auto; display: block; }
-        .dashboard { order: 1; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 380px; text-align: left; flex-shrink: 0; height: 100%; overflow-y: auto; }
+        .dashboard { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: left; margin: 0 auto;}
         .global-alert { font-size: 16px; color: #e74c3c; font-weight: bold; background: #fdebd0; padding: 15px; border-radius: 5px; margin-top: 10px; min-height: 40px; border-left: 5px solid #e74c3c;}
         .status-item { margin-bottom: 10px; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
         input[type="text"] { padding: 8px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; width: 90%;}
@@ -47,7 +47,7 @@
         .option-card input[type="radio"] { width: 18px; height: 18px; margin: 0; flex-shrink: 0; }
         .option-card .option-title { font-weight: bold; font-size: 14px; color: #2c3e50; }
         .option-card .option-desc { font-size: 12px; color: #7f8c8d; }
-        .analysis-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; text-align: left; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+        .analysis-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 560px; text-align: left; margin: 0 auto;}
         .analysis-person-card { border: 1px solid #eee; border-radius: 8px; padding: 10px 12px; }
         .badge-speaking { background: #e74c3c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
         .badge-idle { background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
@@ -55,6 +55,18 @@
         .badge-ok { color: #27ae60; font-weight: bold; }
         .badge-warn { color: #e67e22; font-weight: bold; }
         .badge-alert { color: #e74c3c; font-weight: bold; }
+
+        /* PC（広い画面）: 設定を2カラム、メイン画面を画面高にフィットさせる */
+        @media (min-width: 1000px) {
+            html, body { height: 100%; }
+            body { padding: 10px 20px; }
+            .setup-box { display: inline-block; min-width: 420px; max-width: none; width: auto; max-height: calc(100vh - 40px); overflow-y: auto; }
+            .host-col { flex: 1 1 380px; min-width: 380px; }
+            .main-container { flex-wrap: nowrap; height: calc(100vh - 70px); }
+            .camera-column { width: 340px; height: 100%; flex-shrink: 0; margin: 0; }
+            .dashboard { width: 380px; max-width: none; height: 100%; overflow-y: auto; flex-shrink: 0; margin: 0; }
+            .analysis-card { max-width: none; margin: 0; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+        }
 
         @media (max-width: 640px) {
             body { padding: 14px 8px; }
@@ -466,12 +478,40 @@
             }
         }
 
+        // 直近10秒（1秒ごと10サンプル）の反応割合。0.8以上でアドバイス対象
+        const REACTION_WINDOW_SEC = 10, REACTION_THRESHOLD = 0.8;
+        let speakWindow = [], lookWindow = [];
+        let speakRatio10s = 0, lookRatio10s = 0;
+        function windowRatio(win) {
+            return win.length < REACTION_WINDOW_SEC ? 0 : win.filter(Boolean).length / win.length;
+        }
+        function isOverSpeaking(u) { return (u.speakRatio10s || 0) >= REACTION_THRESHOLD; }
+        function isOverLooking(u) { return (u.lookRatio10s || 0) >= REACTION_THRESHOLD && u.lookingAt !== "正面"; }
+
         function startDurationTimer() {
             setInterval(() => {
                 if (isSpeaking) speakDurationSeconds++; else speakDurationSeconds = 0;
                 if (currentLookTarget !== "正面" && currentLookTarget === lastLookTarget) lookDurationSeconds++; else lookDurationSeconds = 0;
                 lastLookTarget = currentLookTarget;
+
+                speakWindow.push(!!isSpeaking);
+                lookWindow.push(currentLookTarget);
+                if (speakWindow.length > REACTION_WINDOW_SEC) speakWindow.shift();
+                if (lookWindow.length > REACTION_WINDOW_SEC) lookWindow.shift();
+                speakRatio10s = windowRatio(speakWindow);
+                lookRatio10s = currentLookTarget === "正面" ? 0 : windowRatio(lookWindow.map(t => t === currentLookTarget));
             }, 1000);
+        }
+
+        // アドバイス表示を最低10秒は保持する（500ms周期で切り替わって読めないのを防ぐ）
+        const ADVICE_MIN_HOLD_MS = 10000;
+        let currentAdvice = "", adviceShownAt = 0;
+        function showAdvice(message) {
+            const el = document.getElementById('parent-command-alert');
+            if (!el || message === currentAdvice) return;
+            if (currentAdvice && Date.now() - adviceShownAt < ADVICE_MIN_HOLD_MS) return;
+            currentAdvice = message; adviceShownAt = Date.now();
+            el.innerText = message;
         }
 
         // ==========================================
@@ -544,7 +584,9 @@
                         lookingAt: currentLookTarget, 
                         speaking: isSpeaking, 
                         speakDuration: speakDurationSeconds, 
-                        lookDuration: lookDurationSeconds 
+                        lookDuration: lookDurationSeconds,
+                        speakRatio10s: speakRatio10s,
+                        lookRatio10s: lookRatio10s
                     } 
                 };
 
@@ -623,8 +665,7 @@
                 }
             } 
             else if (msg.type === 'personal_command') {
-                const el = document.getElementById('parent-command-alert');
-                if (el) el.innerText = msg.message;
+                showAdvice(msg.message);
             }
             else if (msg.type === 'parent_command') {
                 if (msg.target === myName || msg.target === 'all') {
@@ -753,9 +794,9 @@
 
                 // 診断
                 let diagStr = '<span class="badge-ok">✨ 良好</span>';
-                if (u.speakDuration >= 30) {
-                    diagStr = '<span class="badge-alert">📢 30s超過</span>';
-                } else if (u.lookDuration >= 30 && u.lookingAt !== "正面") {
+                if (isOverSpeaking(u)) {
+                    diagStr = '<span class="badge-alert">📢 話しすぎ</span>';
+                } else if (isOverLooking(u)) {
                     diagStr = '<span class="badge-warn">⚠️ 視線固定</span>';
                 } else if (lookedByCount === 0 && !u.speaking) {
                     diagStr = '<span class="badge-warn" style="color:#e67e22;">💡 孤立気味</span>';
@@ -844,8 +885,7 @@
         function sendPersonalCommand(targetName, targetPeerId, message) {
             // 親機自身宛ての場合
             if (targetName === myName || (targetPeerId && peer && targetPeerId === peer.id)) {
-                const el = document.getElementById('parent-command-alert');
-                if (el) el.innerText = message;
+                showAdvice(message);
                 return;
             }
 
@@ -886,8 +926,8 @@
         function analyzeGlobalStateAndCommand(users) {
             if (users.length < 2) return;
 
-            const overSpeakers = users.filter(u => u.speakDuration >= 30);
-            const overLookers = users.filter(u => u.lookDuration >= 30 && u.lookingAt !== "正面");
+            const overSpeakers = users.filter(isOverSpeaking);
+            const overLookers = users.filter(isOverLooking);
             
             // 孤立判定（誰からも見られておらず、自分も喋っていない人）
             let isolatedUsers = [];
@@ -902,13 +942,13 @@
             users.forEach(u => {
                 let personalMsg = "";
 
-                // 1. 本人が30秒以上喋りすぎている場合
-                if (u.speakDuration >= 30) {
-                    personalMsg = "📢 あなたは30秒以上お話しされています。他の方に話を振ってみましょう！";
+                // 1. 本人が直近10秒の8割以上喋っている場合
+                if (isOverSpeaking(u)) {
+                    personalMsg = "📢 あなたは直近10秒のほとんどお話しされています。他の方に話を振ってみましょう！";
                 }
-                // 2. 本人が特定の人を30秒以上見つめすぎている場合
-                else if (u.lookDuration >= 30 && u.lookingAt !== "正面") {
-                    personalMsg = `⚠️ 警告：${u.lookingAt}さんを30秒以上見続けています。別の人にも顔を向けてみましょう。`;
+                // 2. 本人が直近10秒の8割以上、特定の人を見つめている場合
+                else if (isOverLooking(u)) {
+                    personalMsg = `⚠️ 警告：${u.lookingAt}さんを直近10秒のほとんど見続けています。別の人にも顔を向けてみましょう。`;
                 }
                 // 3. 本人が会話に入れていない（孤立）場合
                 else if (isolatedUsers.includes(u.name)) {
@@ -925,7 +965,7 @@
                         }
                     }
                 }
-                // 5. 他の誰かが30秒以上喋りすぎている場合
+                // 5. 他の誰かが喋りすぎている場合
                 else if (overSpeakers.length > 0) {
                     const otherSpeakers = overSpeakers.filter(s => s.name !== u.name);
                     if (otherSpeakers.length > 0) {
@@ -1061,8 +1101,8 @@
                     const avgMotion = mouthMotionHistory.reduce((a, b) => a + b, 0) / mouthMotionHistory.length;
 
                     // 発音に伴う言葉の口の動き（動きの滑らかさと連続運動量を総合評価）
-                    // 閾値: 口が一定以上開いており、かつ発声特有の動的変形運動(avgMotion > 0.012)があること
-                    const isTalkingMotion = (mouthHeight > 0.022) && (avgMotion > 0.012);
+                    // 閾値: 小さな口の動きでも反応するよう緩和（開き 0.022→0.010 / 運動量 0.012→0.005）
+                    const isTalkingMotion = (mouthHeight > 0.010) && (avgMotion > 0.005);
 
                     // 「笑顔」の判定（口角の上昇 ＋ 横拡大 ＋ 会話特有の変形運動が少ない）
                     const avgCornerY = (mouthLeft.y + mouthRight.y) / 2;

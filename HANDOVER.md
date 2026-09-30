@@ -21,7 +21,7 @@
 .
 ├── index.html                           # メインアプリケーション（親機・子機兼用、視線・発話検知、P2P同期、リアルタイム集計）
 ├── dashboard_for_ai_facilitator.html   # 管理者/ファシリテーター用 リアルタイム会話分析ダッシュボード (Chart.js + Tailwind)
-├── server.js                            # ローカル開発/シグナリング用WebSocketサーバー (Node.js)
+├── server.js                            # ローカル開発用PeerJSシグナリングサーバー (Node.js / peer)
 ├── package.json                         # 依存関係定義 (peer, ws)
 ├── package-lock.json
 ├── HANDOVER.md                          # 本引き継ぎ資料
@@ -36,7 +36,7 @@
 | :--- | :--- |
 | **`index.html`** | 参加者が開くメインUI。親機（Host）または子機（Guest）として動作。<br>・座席設定（ドラッグ配置と子機への自動同期）<br>・MediaPipe FaceMeshによる視線推定（鼻・顔の端の座標）<br>・マイク音量＋口元変形ベクトルによる厳密な発話検知<br>・PeerJSによるP2Pメッシュ/スター型データ通信<br>・各参加者への個別アドバイス送信＆「寂しいよ」アラート<br>・リアルタイム集計テーブル＆CSVエクスポート |
 | **`dashboard_for_ai_facilitator.html`** | ファシリテーター/研究者向けの大画面モニターUI。<br>ホストのルームコードを入力してP2P接続し、全員の発話時間グラフ（棒グラフ）、発話シェア（ドーナツグラフ）、視線・被注視数一覧、イベント履歴を常時モニタリング。CSVダウンロード機能付き。 |
-| **`server.js`** | ローカル開発・検証用の簡易シグナリングサーバー（ポート8080）。本番（GitHub Pages）ではパブリックなPeerJSクラウドサーバー（0.peerjs.com）を利用。 |
+| **`server.js`** | ローカル開発・検証用の簡易PeerJSシグナリングサーバー（ポート9000、パス `/peerjs`）。`localhost` / `127.0.0.1` でページを開いたときのみ接続先になります。本番（GitHub Pages）ではパブリックなPeerJSクラウドサーバー（0.peerjs.com）を利用。 |
 
 ---
 
