@@ -332,6 +332,16 @@
                 showToastNotification();
                 addAiEventLog("🥺 寂しいよ発信", "誰かがサポート・発言機会を求めています（匿名発信）", "warning");
             }
+            else if (data.type === 'game_end') {
+                if (data.sos) {
+                    lonelyEventsCount++;
+                    document.getElementById('kpi-lonely').innerHTML = `${lonelyEventsCount} <span class="text-xs font-normal text-slate-400">回</span>`;
+                    showToastNotification();
+                    addAiEventLog("🎮 ミニゲーム中のSOS", "ミニゲーム中にだれかがSOSを送りました（匿名）", "warning");
+                } else {
+                    addAiEventLog("🎮 ミニゲーム終了", "SOSはありませんでした", "info");
+                }
+            }
             else if (data.type === 'personal_command' || data.type === 'parent_command') {
                 addAiEventLog("🤖 AI個別アドバイス", data.message || "個別指示が配信されました", "ai");
             }
