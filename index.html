@@ -139,10 +139,8 @@
         .card-head h2 { margin: 0; }
         .ratio-head { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; margin-bottom: 6px; color: var(--muted); }
         #talk-ratio-bar { height: 16px; background: #eef1f5; border-radius: 8px; overflow: hidden; display: flex; margin-bottom: 14px; }
-        .analysis-table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 13px; }
-        .analysis-table th { background: #f6f8fa; color: var(--muted); text-align: left; font-size: 12px; padding: 8px 6px; }
-        .analysis-table td { padding: 8px 6px; border-bottom: 1px solid #f0f2f5; }
-        .analysis-person-card { border: 1px solid #eee; border-radius: 8px; padding: 10px 12px; }
+        #analysis-cards { display: flex; flex-direction: column; gap: 8px; }
+        .analysis-person-card { border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; }
         .badge-speaking { background: var(--danger); color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
         .badge-idle { background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
         .badge-listening { background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
@@ -495,7 +493,7 @@
             </div>
 
             <div id="analysis-detail-wrapper">
-                <div id="analysis-cards" style="display: flex; flex-direction: column; gap: 8px;">
+                <div id="analysis-cards">
                     <div style="text-align:center; color:#999; padding:15px; font-size:13px;">データを収集中です...</div>
                 </div>
             </div>
@@ -1240,19 +1238,19 @@
                 cardsHtml += `
                     <div class="analysis-person-card">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                            <span style="font-weight:bold; font-size:14px; color:#2c3e50;">
+                            <span style="font-weight:bold; font-size:14px; color:var(--text);">
                                 <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${stat.color}; margin-right:5px;"></span>${u.name}
                             </span>
                             ${speakBadge}
                         </div>
-                        <div style="height:8px; background:#eee; border-radius:4px; overflow:hidden; margin-bottom:6px;">
+                        <div style="height:8px; background:#eef1f5; border-radius:4px; overflow:hidden; margin-bottom:6px;">
                             <div style="width:${percent}%; height:100%; background:${stat.color};"></div>
                         </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#7f8c8d; margin-bottom:2px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--muted); margin-bottom:2px;">
                             <span><b>${totalStr}</b> (${percent.toFixed(1)}%)</span>
                             ${diagStr}
                         </div>
-                        <div style="font-size:12px; color:#7f8c8d;">視線:${u.lookingAt || '正面'}・被注視:${lookedByCount}人</div>
+                        <div style="font-size:12px; color:var(--muted);">視線:${u.lookingAt || '正面'}・被注視:${lookedByCount}人</div>
                     </div>
                 `;
             });
