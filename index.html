@@ -237,6 +237,33 @@
             .seat { width: 36px; height: 36px; font-size: 11px; }
             .seat-label { font-size: 10px; bottom: -18px; }
         }
+
+        /* ===== スマホの横画面（幅は広いが高さが低い） ===== */
+        @media (orientation: landscape) and (max-height: 520px) and (max-width: 1099px) {
+            .app-header { position: static; padding: 6px 14px; }
+            .app-title { font-size: 16px; }
+            .setup { padding: 8px 16px; }
+            .segmented { margin-bottom: 8px; }
+            .segmented label { padding: 6px 8px; }
+            .wiz-progress { margin-bottom: 8px; }
+            .card { padding: 12px 14px; }
+            .start-bar { padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); }
+            .btn-lg { padding: 11px 16px; }
+            .app-main { display: grid; grid-template-columns: 230px minmax(0, 1fr); max-width: none; gap: 10px; align-items: start; padding: 10px 14px 16px; }
+            .col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+            #analysis-panel { grid-column: 1 / -1; }
+            .me-body { flex-direction: column; align-items: stretch; }
+            .video-box { width: 100%; max-width: 150px; margin: 0 auto; }
+            .global-alert { min-height: 0; font-size: 15px; padding: 12px; }
+            .lonely-btn { padding: 12px; font-size: 17px; }
+            .game-overlay { padding: 6px; }
+            .game-panel { padding: 10px 14px; max-height: 100%; }
+            .game-header { margin-bottom: 8px; padding-bottom: 6px; }
+            .game-intro-title { font-size: 20px; margin: 2px 0 6px; }
+            .game-countdown { font-size: 36px; }
+            #runner-canvas { width: auto !important; max-width: 100%; max-height: calc(100vh - 110px); margin: 0 auto; }
+            .quiz-choices { grid-template-columns: 1fr 1fr; }
+        }
     </style>
 </head>
 <body>
