@@ -171,23 +171,8 @@
         .game-overlay canvas { border-radius: 10px; touch-action: none; }
         .game-overlay button { width: auto; }
         .game-note { font-size: 13px; color: var(--muted); }
-        .numtap-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-        .numtap-cell { margin: 0; padding: 0; height: 52px; font-size: 18px; background: #eef1f5; color: var(--text); border: 1.5px solid var(--line); width: 100% !important; }
-        .numtap-cell.numtap-sos { font-size: 12px; font-weight: normal; color: var(--muted); }
-        .reflex-box { height: 220px; border-radius: 12px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 20px; font-weight: bold; cursor: pointer; user-select: none; touch-action: manipulation; }
-        .reflex-idle { background: var(--primary-soft); color: var(--primary); }
-        .reflex-wait { background: #fde8e8; color: #b42318; }
-        .reflex-go { background: #dff5e6; color: #14703a; }
-        .reflex-sos { position: absolute; width: auto !important; margin: 0; padding: 3px 8px; font-size: 11px; font-weight: normal; background: rgba(255,255,255,0.55); color: #b42318; border: 1px solid rgba(180,35,24,0.35); border-radius: 999px; }
         .game-big { font-size: 34px; font-weight: bold; text-align: center; margin: 8px 0; }
         .game-input { width: 100% !important; font-size: 22px !important; text-align: center; }
-        .terms-box { height: 160px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; padding: 10px; font-size: 12px; color: #555; background: #fafbfc; }
-        .terms-arena { position: relative; height: 200px; background: #f3f5f8; border-radius: 10px; overflow: hidden; }
-        .terms-arena button { position: absolute; transition: left 0.12s, top 0.12s; margin: 0; }
-        .terms-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-        .terms-grid button { width: 100%; margin: 0; }
-        .terms-tile { font-size: 34px; background: #eef1f5 !important; color: #333; padding: 12px 0; }
-        .terms-tile.on { background: #cfe0ff !important; outline: 3px solid var(--primary); }
         .game-choice { display: block; width: 100% !important; margin-top: 10px; padding: 14px; font-size: 17px; }
 
         .game-header-right { display: flex; align-items: center; gap: 8px; }
@@ -216,13 +201,6 @@
         .quiz-choice.picked, .quiz-choice.picked:disabled { border-color: var(--primary); background: var(--primary-soft); color: var(--text); }
         .quiz-choice.correct, .quiz-choice.correct:disabled { border-color: #1f9d55; background: #e3f6ea; color: #14683a; font-weight: bold; }
         .quiz-choice.wrong, .quiz-choice.wrong:disabled { border-color: var(--danger); background: #fdecec; color: var(--danger); }
-        .wolf-word { font-size: 40px; font-weight: bold; text-align: center; margin: 4px 0 14px; padding: 18px; background: #f3efff; color: var(--game); border-radius: 12px; }
-        .wolf-word.hidden { color: transparent; text-shadow: 0 0 14px rgba(124, 77, 219, 0.5); }
-        .typing-romaji { text-align: center; font-size: 20px; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; font-family: ui-monospace, Menlo, monospace; }
-        .typing-romaji .typed { color: var(--primary); font-weight: bold; }
-        .typing-combo { text-align: center; font-weight: bold; color: #e08a1e; height: 22px; }
-        .typing-combo.pop { animation: combo-pop 0.3s ease-out; }
-        @keyframes combo-pop { from { transform: scale(1.5); } to { transform: scale(1); } }
         @media (max-width: 480px) { .quiz-choices { grid-template-columns: 1fr; } .game-intro-title { font-size: 24px; } }
 
         /* ===== タブレット ===== */
@@ -363,36 +341,12 @@
                                 <span><span class="option-title">ゲームなし</span><br><span class="option-desc">ミニゲームを使わない</span></span>
                             </label>
                             <label class="option-card">
-                                <input type="radio" name="game-mode" value="wolf" onchange="onGameModeChange()">
-                                <span><span class="option-title">ワードウルフ</span><br><span class="option-desc">1人だけ違うお題の人を、話して見つける（3人以上）。投票で自分に入れるとこっそりSOS</span></span>
-                            </label>
-                            <label class="option-card">
                                 <input type="radio" name="game-mode" value="quiz" onchange="onGameModeChange()">
                                 <span><span class="option-title">早押しクイズ</span><br><span class="option-desc">全員に同じ問題が同時に出る4択クイズ。最後のアンケートでこっそりSOS</span></span>
                             </label>
                             <label class="option-card">
-                                <input type="radio" name="game-mode" value="typing" onchange="onGameModeChange()">
-                                <span><span class="option-title">⌨️ タイピング</span><br><span class="option-desc">ゲーム中に「sos」と打つとこっそりSOS</span></span>
-                            </label>
-                            <label class="option-card">
                                 <input type="radio" name="game-mode" value="runner" onchange="onGameModeChange()">
                                 <span><span class="option-title">ジャンプアクション</span><br><span class="option-desc">空のSOSアイテムを取るとこっそりSOS</span></span>
-                            </label>
-                            <label class="option-card">
-                                <input type="radio" name="game-mode" value="terms" onchange="onGameModeChange()">
-                                <span><span class="option-title">利用規約に同意したい</span><br><span class="option-desc">全ステージクリアすると、最後にSOSを選べる</span></span>
-                            </label>
-                            <label class="option-card">
-                                <input type="radio" name="game-mode" value="numtap" onchange="onGameModeChange()">
-                                <span><span class="option-title">数字タップ</span><br><span class="option-desc">盤面にまぎれた「SOS」マスをタップするとこっそりSOS</span></span>
-                            </label>
-                            <label class="option-card">
-                                <input type="radio" name="game-mode" value="reflex" onchange="onGameModeChange()">
-                                <span><span class="option-title">反射神経テスト</span><br><span class="option-desc">赤い間に一瞬だけ現れる小さな「SOS」をタップするとこっそりSOS</span></span>
-                            </label>
-                            <label class="option-card">
-                                <input type="radio" name="game-mode" value="stopwatch" onchange="onGameModeChange()">
-                                <span><span class="option-title">10秒ストップ</span><br><span class="option-desc">最後のアンケートでこっそりSOS</span></span>
                             </label>
                             <label class="option-card">
                                 <input type="radio" name="game-mode" value="random" onchange="onGameModeChange()">
@@ -527,7 +481,7 @@
         let analysisDisplayMode = 'full';   // 'full' | 'simple' | 'hidden'
         let analysisVisibilityScope = 'all'; // 'all' | 'host'
         // ホストが設定するミニゲーム・SOSボタン設定
-        let gameMode = 'none';      // 'none' | 'wolf' | 'quiz' | 'typing' | 'runner' | 'terms' | 'numtap' | 'reflex' | 'stopwatch' | 'random'
+        let gameMode = 'none';      // 'none' | 'quiz' | 'runner' | 'random'
         let gameSilenceSec = 30;    // この秒数、1人だけ話せていなかったらゲーム開始
         let showSosButton = true;   // 「寂しいよ」ボタンを表示するか（全端末に同期）
         let isSpeaking = false, currentLookTarget = "正面", currentFaceRatio = 0.5;
@@ -1431,30 +1385,12 @@
         // ==========================================
         const QUIZ_COUNT = 3, QUIZ_SEC = 10, QUIZ_ANSWER_SEC = 8; // 1問10秒（8秒で締め切り、残り2秒で正解発表）
         const GAME_INFO = {
-            wolf: { title: 'ワードウルフ', duration: 30, final: true,
-                how: '1人だけ少し違うお題をもらった「ウルフ」がいます。30秒、お題について話してウルフを見つけよう。お題の言葉そのものは言わないこと。',
-                sos: '最後の投票で<b>自分自身</b>に投票すると、こっそりSOSが送れます（得票には数えません）。' },
             quiz: { title: '早押しクイズ', duration: QUIZ_COUNT * QUIZ_SEC, final: true,
                 how: '全員に同じ問題が同時に出ます。早く正解するほど高得点。全3問です。',
                 sos: '最後のアンケートで「ちょっと話に入りにくい」を選ぶと、こっそりSOSが送れます。' },
             runner: { title: 'ジャンプアクション', duration: 30,
                 how: 'タップ（スペースキー）でジャンプ、空中でもう一度タップで2段ジャンプ。コインを集めて、敵は上から踏むと高得点。だんだん速くなります。',
                 sos: '空に浮かぶ<b>SOSアイテム</b>を取ると、こっそりSOSが送れます。' },
-            typing: { title: 'タイピングバトル', duration: 30,
-                how: '表示されたことばをローマ字で入力。続けて正解するとコンボでボーナス。だんだん長いことばになります（英字キーボードに切り替えてね）。',
-                sos: 'ゲーム中に <b>sos</b> と入力すると、こっそりSOSが送れます。' },
-            terms: { title: '利用規約に同意したい', duration: 30, final: true,
-                how: 'なかなか同意させてくれない利用規約を、3ステージ突破して同意しよう。',
-                sos: '最後のアンケートで「ちょっと話に入りにくい」を選ぶと、こっそりSOSが送れます。' },
-            numtap: { title: '数字タップ', duration: 40,
-                how: 'バラバラに並んだ1〜24を、小さい順にタップ。速く正確に押すほど高得点。全部押せたら残り時間がボーナスになります。',
-                sos: '数字にまぎれた<b>「SOS」マス</b>をタップすると、こっそりSOSが送れます（得点には影響しません）。' },
-            reflex: { title: '反射神経テスト', duration: 30,
-                how: '画面が赤から緑に変わった瞬間にタップ。反応が速いほど高得点です。赤いうちに押すと0点。30秒の間に何回でも挑戦できます。',
-                sos: '赤い待ち時間に一瞬だけ現れる小さな<b>「SOS」</b>をタップすると、こっそりSOSが送れます。' },
-            stopwatch: { title: '10秒ストップ', duration: 30, final: true,
-                how: '数字が途中から隠れるストップウォッチを、ぴったり10.00秒で止めよう。誤差が小さいほど高得点（いちばん良い回が得点）。',
-                sos: '最後のアンケートで「ちょっと話に入りにくい」を選ぶと、こっそりSOSが送れます。' }
         };
         const GAME_TYPES = Object.keys(GAME_INFO);
         const GAME_INTRO_SEC = 5;
@@ -1476,7 +1412,7 @@
         // 親機側の状態
         let lastSpokeAtSec = {};   // 参加者ごとの最後に話した時刻（会議の経過秒）
         let gameCooldownUntilSec = 0;
-        let hostGame = null; // { id, gameType, players, results: { [name]: { score, sos, vote } }, live: { [name]: score }, wolfInfo, timer, startElapsed }
+        let hostGame = null; // { id, gameType, players, results: { [name]: { score, sos, vote } }, live: { [name]: score }, timer, startElapsed }
         let gameLog = [];    // CSV用 [{ elapsedSec, gameType, players, sosCount }]
 
         // 各端末側の状態
@@ -1567,19 +1503,12 @@
             if (myRole !== 'parent' || hostGame || gameMode === 'none') return;
             const players = Object.keys(hostGlobalState);
             let candidates = gameMode === 'random' ? GAME_TYPES.slice() : [gameMode];
-            // ワードウルフは3人以上いないと成り立たないので、ランダムのときは候補から外す
-            if (gameMode === 'random' && players.length < 3) candidates = candidates.filter(t => t !== 'wolf');
             const gameType = pickRandom(candidates);
             const info = GAME_INFO[gameType];
             const msg = { type: 'game_start', gameId: Date.now(), gameType: gameType, introSec: GAME_INTRO_SEC, durationSec: info.duration, players: players };
-            let wolfInfo = null;
             if (gameType === 'quiz') msg.questions = buildQuizQuestions();
-            if (gameType === 'wolf') {
-                wolfInfo = buildWolfAssignment(players);
-                msg.wolfWords = wolfInfo.words;
-            }
             const waitSec = GAME_INTRO_SEC + info.duration + (info.final ? GAME_FINAL_SEC : 0) + GAME_GRACE_SEC;
-            hostGame = { id: msg.gameId, gameType: gameType, players: players, results: {}, live: {}, wolfInfo: wolfInfo,
+            hostGame = { id: msg.gameId, gameType: gameType, players: players, results: {}, live: {},
                          startElapsed: meetingElapsedSeconds, timer: setTimeout(finishGameForAll, waitSec * 1000) };
             broadcastToGuests(msg);
             startLocalGame(msg);
@@ -1604,26 +1533,6 @@
             clearTimeout(hostGame.timer);
             const results = hostGame.results;
             let headline = '', details = [], prompt = pickRandom(TALK_PROMPTS);
-
-            if (hostGame.gameType === 'wolf' && hostGame.wolfInfo) {
-                // 自分への投票（＝SOS）は得票に数えない
-                const w = hostGame.wolfInfo;
-                const tally = {};
-                Object.keys(results).forEach(voter => {
-                    const v = results[voter].vote;
-                    if (v && v !== voter) tally[v] = (tally[v] || 0) + 1;
-                });
-                const max = Math.max(0, ...Object.values(tally));
-                const top = Object.keys(tally).filter(n => tally[n] === max);
-                const caught = max > 0 && top.length === 1 && top[0] === w.wolfName;
-                Object.keys(results).forEach(n => {
-                    results[n].score = caught ? (n === w.wolfName ? 0 : 3) : (n === w.wolfName ? 5 : 0);
-                });
-                headline = caught ? `市民チームの勝ち！ ウルフは ${w.wolfName} でした` : `ウルフの勝ち！ ウルフは ${w.wolfName} でした`;
-                details = [`市民のお題：${w.citizenWord}`, `ウルフのお題：${w.wolfWord}`,
-                    max > 0 ? `いちばん票を集めた人：${top.join('、')}` : '有効な票はありませんでした'];
-                prompt = 'ウルフだと気づいたのはどの発言？ ウルフはどうやって話を合わせていた？';
-            }
 
             const ranking = Object.keys(results).map(name => ({ name: name, score: results[name].score }))
                 .sort((a, b) => b.score - a.score);
@@ -1683,14 +1592,8 @@
                 sfx('start');
                 runGameClock(msg.durationSec);
                 startProgressReporter();
-                if (msg.gameType === 'typing') startTypingGame();
-                else if (msg.gameType === 'runner') startRunnerGame();
-                else if (msg.gameType === 'quiz') startQuizGame(msg.questions || []);
-                else if (msg.gameType === 'wolf') startWolfGame(msg.wolfWords || {});
-                else if (msg.gameType === 'numtap') startNumTapGame();
-                else if (msg.gameType === 'reflex') startReflexGame();
-                else if (msg.gameType === 'stopwatch') startStopwatchGame();
-                else startTermsGame();
+                if (msg.gameType === 'runner') startRunnerGame();
+                else startQuizGame(msg.questions || []);
             }, 1000);
             game.timers.push(iv);
         }
@@ -1702,7 +1605,6 @@
             const iv = setInterval(() => {
                 if (game !== g) return clearInterval(iv);
                 left--;
-                g.timeLeft = Math.max(0, left);
                 if (!g.finalShown) gameEl('game-timer').innerText = `残り ${Math.max(0, left)}秒`;
                 if (left <= 0) { clearInterval(iv); onGameTimeUp(); }
             }, 1000);
@@ -1712,7 +1614,6 @@
         // スコアが変わったら親機へ途中経過を送る（全員の画面のスコアボード用）
         function startProgressReporter() {
             const g = game;
-            if (g.gameType === 'wolf') return;
             const iv = setInterval(() => {
                 if (game !== g || g.reported || g.score === g.lastSentScore) return;
                 g.lastSentScore = g.score;
@@ -1722,7 +1623,7 @@
         }
 
         function onGameScores(msg) {
-            if (!game || game.id !== msg.gameId || game.gameType === 'wolf') return;
+            if (!game || game.id !== msg.gameId) return;
             const el = gameEl('game-live');
             const rows = Object.keys(msg.scores).map(name => ({ name: name, score: msg.scores[name] })).sort((a, b) => b.score - a.score);
             const max = Math.max(1, ...rows.map(r => r.score));
@@ -1737,8 +1638,7 @@
 
         function onGameTimeUp() {
             if (!game) return;
-            if (game.gameType === 'wolf') { showWolfVote(); return; }
-            if (GAME_INFO[game.gameType].final) { showSurvey(game.gameType === 'terms' && !game.termsCleared ? '時間切れ！ でも最後に1つだけ' : 'おつかれさま！ 最後に1つだけ'); return; }
+            if (GAME_INFO[game.gameType].final) { showSurvey('おつかれさま！ 最後に1つだけ'); return; }
             reportAndWait();
         }
 
@@ -1751,7 +1651,7 @@
             game.cleanup = [];
             gameEl('game-timer').innerText = '終了';
             setGameBody(`<div class="game-intro-title">おつかれさま！</div>
-                ${game.gameType === 'wolf' ? '' : `<p style="text-align:center;">あなたのスコア：<b style="font-size:22px;">${game.score}</b></p>`}
+                <p style="text-align:center;">あなたのスコア：<b style="font-size:22px;">${game.score}</b></p>
                 <p class="game-note" style="text-align:center;">みんなの結果を集計しています...</p>`);
             sendToHost({ type: 'game_result', gameId: game.id, name: myName, score: game.score, sos: game.sos, vote: game.vote });
         }
@@ -1778,7 +1678,7 @@
             g.timers.push(iv);
         }
 
-        // アンケート（クイズ・利用規約の最後）。全員が必ずどれかを押すので、押す動作から誰がSOSか分からない
+        // アンケート（クイズの最後）。全員が必ずどれかを押すので、押す動作から誰がSOSか分からない
         function showSurvey(title) {
             const g = game;
             if (!g || g.reported || g.finalShown) return;
@@ -1834,51 +1734,6 @@
 
         function escapeHtml(str) {
             return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-        }
-
-        // --- ワードウルフ ---
-        const WOLF_PAIRS = [
-            ['カレー', 'シチュー'], ['犬', '猫'], ['海', 'プール'], ['コーヒー', '紅茶'], ['スマホ', 'パソコン'],
-            ['夏休み', '冬休み'], ['ラーメン', 'うどん'], ['映画館', 'カラオケ'], ['電車', 'バス'], ['りんご', 'みかん'],
-            ['図書館', '本屋'], ['サッカー', 'バスケットボール'], ['お正月', 'クリスマス'], ['寿司', '焼肉'], ['温泉', 'サウナ'],
-            ['遊園地', '動物園'], ['朝ごはん', '夜ごはん'], ['コンビニ', 'スーパー'], ['雪', '雨'], ['ゲーム', 'マンガ']
-        ];
-        function buildWolfAssignment(players) {
-            const pair = shuffle(pickRandom(WOLF_PAIRS));
-            const wolfName = pickRandom(players.length ? players : [myName]);
-            const words = {};
-            (players.length ? players : [myName]).forEach(n => { words[n] = n === wolfName ? pair[1] : pair[0]; });
-            return { words: words, wolfName: wolfName, citizenWord: pair[0], wolfWord: pair[1] };
-        }
-
-        function startWolfGame(words) {
-            const word = words[myName] || '（お題を受け取れませんでした）';
-            setGameBody(`
-                <div class="game-note" style="text-align:center;">あなたのお題</div>
-                <div class="wolf-word">${escapeHtml(word)}</div>
-                <div class="info-tip">お題について自由に話そう。話がかみ合わない人がいたら、その人がウルフかも。<br>
-                自分だけ違うかも？と思ったら、バレないように話を合わせよう。</div>
-                <div class="game-note"><b>話のきっかけ例</b><br>「それ、よく使う（行く・食べる）？」「どんな時に思い出す？」「好き？ 苦手？」「いくらくらい？」</div>
-                <button class="game-choice" style="background:#64748b;" id="wolf-hide">お題をかくす / 見る</button>`);
-            const wordEl = document.querySelector('#game-body .wolf-word');
-            gameEl('wolf-hide').onclick = () => wordEl.classList.toggle('hidden');
-        }
-
-        function showWolfVote() {
-            const g = game;
-            if (!g || g.reported || g.finalShown) return;
-            g.finalShown = true;
-            const players = g.players.length ? g.players : [myName];
-            setGameBody(`<div class="game-intro-title" style="font-size:22px;">投票タイム</div>
-                <p>ウルフだと思う人に投票してください。</p>` +
-                players.map(n => `<button class="game-choice vote-btn" data-name="${escapeHtml(n)}">${escapeHtml(n)}${n === myName ? '（自分）' : ''}</button>`).join(''));
-            document.querySelectorAll('#game-body .vote-btn').forEach(b => b.onclick = () => {
-                if (game !== g) return;
-                g.vote = b.dataset.name;
-                g.sos = g.vote === myName; // 自分への投票＝こっそりSOS
-                reportAndWait();
-            });
-            startFinalCountdown();
         }
 
         // --- 早押しクイズ（全員同時に出題） ---
@@ -1972,192 +1827,6 @@
             };
             g.timers.push(setInterval(tick, 100));
             tick();
-        }
-
-        // --- タイピングバトル ---
-        // ※ ローマ字に "sos" を含む単語は入れないこと（SOSと誤判定されるため）
-        const TYPING_TIERS = [
-            [['ねこ', 'neko'], ['いぬ', 'inu'], ['うみ', 'umi'], ['やま', 'yama'], ['そら', 'sora'], ['かぜ', 'kaze'],
-             ['ほし', 'hoshi'], ['はな', 'hana'], ['くも', 'kumo'], ['あめ', 'ame'], ['もり', 'mori'], ['ゆき', 'yuki']],
-            [['さくら', 'sakura'], ['すいか', 'suika'], ['りんご', 'ringo'], ['とけい', 'tokei'], ['はなび', 'hanabi'], ['くじら', 'kujira'],
-             ['ぷりん', 'purin'], ['かいぎ', 'kaigi'], ['いけん', 'iken'], ['でんしゃ', 'densha'], ['ぺんぎん', 'pengin'], ['おにぎり', 'onigiri'],
-             ['たいよう', 'taiyou'], ['ひこうき', 'hikouki']],
-            [['ゆきだるま', 'yukidaruma'], ['ともだち', 'tomodachi'], ['しつもん', 'shitsumon'], ['えんぴつ', 'enpitsu'], ['たこやき', 'takoyaki'],
-             ['かんらんしゃ', 'kanransha'], ['ちょこれーと', 'chokore-to'], ['じてんしゃ', 'jitensha'], ['ほっかいどう', 'hokkaidou'],
-             ['あいすくりーむ', 'aisukuri-mu'], ['ぷれぜんてーしょん', 'purezente-shon'], ['ふぁしりてーたー', 'fashirite-ta-']]
-        ];
-        // ヘボン式／訓令式どちらで打っても正解にする
-        function normalizeRomaji(s) {
-            return s.normalize('NFKC').toLowerCase().replace(/\s/g, '').replace(/ー/g, '-')
-                .replace(/shi/g, 'si').replace(/chi/g, 'ti').replace(/tsu/g, 'tu').replace(/fu/g, 'hu')
-                .replace(/ji/g, 'zi').replace(/sh([auo])/g, 'sy$1').replace(/ch([auo])/g, 'ty$1').replace(/j([auo])/g, 'zy$1')
-                .replace(/nn/g, 'n');
-        }
-
-        function startTypingGame() {
-            const g = game;
-            let word = null, cleared = 0, combo = 0;
-            setGameBody(`
-                <div class="typing-combo" id="typing-combo">&nbsp;</div>
-                <div class="game-intro-title" id="typing-kana" style="font-size:38px;"></div>
-                <div class="typing-romaji" id="typing-romaji"></div>
-                <input type="text" id="typing-input" class="game-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" lang="en" placeholder="ローマ字で入力">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-                    <span class="game-note" id="game-sos-ack"></span>
-                    <button id="typing-skip" style="background:#94a3b8; font-size:14px; padding:6px 14px; margin:0;">とばす</button>
-                </div>`);
-            const input = gameEl('typing-input');
-            const renderRomaji = (typed) => {
-                // 入力済みの部分を色付けする（表示どおりのつづりで打っている場合）
-                let n = 0;
-                while (n < typed.length && n < word[1].length && typed[n] === word[1][n]) n++;
-                gameEl('typing-romaji').innerHTML = `<span class="typed">${escapeHtml(word[1].slice(0, n))}</span>${escapeHtml(word[1].slice(n))}`;
-            };
-            const nextWord = () => {
-                const tier = TYPING_TIERS[cleared < 3 ? 0 : cleared < 6 ? 1 : 2];
-                let w;
-                do { w = pickRandom(tier); } while (word && w[0] === word[0]);
-                word = w;
-                gameEl('typing-kana').innerText = w[0];
-                input.value = '';
-                renderRomaji('');
-            };
-            const showCombo = () => {
-                const el = gameEl('typing-combo');
-                el.innerText = combo >= 2 ? `${combo} コンボ！` : ' ';
-                el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
-            };
-            input.addEventListener('input', () => {
-                if (game !== g || g.reported) return;
-                const raw = input.value.normalize('NFKC').toLowerCase().trim();
-                if (raw.includes('sos')) {
-                    g.sos = true;
-                    input.value = '';
-                    renderRomaji('');
-                    quietSosAck();
-                    return;
-                }
-                if (raw === word[0] || normalizeRomaji(raw) === normalizeRomaji(word[1])) {
-                    cleared++; combo++;
-                    g.score += word[1].length + Math.min(combo - 1, 5) * 2; // 長いことば＋コンボほど高得点
-                    setGameScore(`${g.score}点`);
-                    sfx(combo >= 3 ? 'combo' : 'coin');
-                    showCombo();
-                    nextWord();
-                    return;
-                }
-                renderRomaji(raw);
-            });
-            gameEl('typing-skip').onclick = () => { combo = 0; showCombo(); nextWord(); input.focus(); };
-            setGameScore('0点');
-            nextWord();
-            input.focus();
-        }
-
-        // --- 数字タップ（1〜24を順番に。盤面に「SOS」マスがまぎれている） ---
-        function startNumTapGame() {
-            const g = game;
-            const N = 24;
-            let next = 1;
-            const cells = shuffle(Array.from({ length: N }, (_, i) => i + 1).concat(['sos']));
-            setGameBody(`
-                <div class="game-note" style="text-align:center; margin-bottom:8px;" id="numtap-hint">1 から順番にタップ</div>
-                <div class="numtap-grid">${cells.map(c => c === 'sos'
-                    ? '<button class="numtap-cell numtap-sos" data-n="sos">SOS</button>'
-                    : `<button class="numtap-cell" data-n="${c}">${c}</button>`).join('')}</div>
-                <div class="game-note" id="game-sos-ack" style="text-align:center; margin-top:6px;">&nbsp;</div>`);
-            setGameScore('0点');
-            document.querySelectorAll('#game-body .numtap-cell').forEach(b => b.onclick = () => {
-                if (game !== g || g.reported) return;
-                if (b.dataset.n === 'sos') { g.sos = true; sfx('sos'); quietSosAck(); return; }
-                if (+b.dataset.n !== next) { sfx('bad'); return; }
-                b.style.visibility = 'hidden';
-                g.score += 10; next++;
-                sfx('coin');
-                gameEl('numtap-hint').innerText = next <= N ? `次は ${next}` : 'クリア！';
-                if (next > N) {
-                    g.score += Math.max(0, g.timeLeft || 0) * 3; // 残り時間ボーナス
-                    setGameScore(`${g.score}点`);
-                    sfx('combo');
-                    gameLater(reportAndWait, 600);
-                } else setGameScore(`${g.score}点`);
-            });
-        }
-
-        // --- 反射神経テスト（赤→緑。赤い待ち時間に小さな「SOS」がまぎれる） ---
-        function startReflexGame() {
-            const g = game;
-            let state = 'idle', goAt = 0, waitTimer = null, sosTimer = null;
-            setGameBody(`
-                <div class="reflex-box" id="reflex-box" style="position:relative;"></div>
-                <div class="game-note" id="game-sos-ack" style="text-align:center; margin-top:6px;">&nbsp;</div>`);
-            const box = gameEl('reflex-box');
-            const paint = (cls, text) => { box.className = 'reflex-box ' + cls; box.firstChild && box.removeChild(box.firstChild); const t = document.createElement('div'); t.className = 'reflex-text'; t.innerText = text; box.insertBefore(t, box.firstChild); };
-            const clearSos = () => { const c = gameEl('reflex-sos'); if (c) c.remove(); };
-            const showSosChip = () => {
-                clearSos();
-                const chip = document.createElement('button');
-                chip.id = 'reflex-sos'; chip.className = 'reflex-sos'; chip.innerText = 'SOS';
-                chip.style.left = (8 + Math.random() * 72) + '%'; chip.style.top = (8 + Math.random() * 72) + '%';
-                chip.onclick = (e) => { e.stopPropagation(); if (game !== g || g.reported) return; g.sos = true; sfx('sos'); quietSosAck(); chip.remove(); };
-                box.appendChild(chip);
-                sosTimer = setTimeout(clearSos, 1400);
-            };
-            const idle = (text) => { state = 'idle'; clearSos(); paint('reflex-idle', text); };
-            const arm = () => {
-                state = 'wait'; paint('reflex-wait', '赤の間は待つ…');
-                const wait = 1500 + Math.random() * 2500;
-                sosTimer = setTimeout(showSosChip, wait * 0.25 + Math.random() * wait * 0.3);
-                waitTimer = setTimeout(() => { clearSos(); state = 'go'; goAt = performance.now(); paint('reflex-go', '今！タップ'); }, wait);
-            };
-            box.onclick = () => {
-                if (game !== g || g.reported) return;
-                if (state === 'idle') { arm(); return; }
-                if (state === 'wait') { clearTimeout(waitTimer); clearTimeout(sosTimer); sfx('bad'); idle('早すぎ（0点）。タップでもう一度'); return; }
-                if (state === 'go') {
-                    const ms = Math.round(performance.now() - goAt);
-                    const pts = Math.max(0, Math.round((1000 - ms) / 10));
-                    g.score += pts; setGameScore(`${g.score}点`);
-                    sfx(pts >= 70 ? 'combo' : 'good');
-                    idle(`${ms} ms（+${pts}点）。タップで次へ`);
-                }
-            };
-            g.cleanup.push(() => { clearTimeout(waitTimer); clearTimeout(sosTimer); });
-            setGameScore('0点');
-            idle('タップして開始');
-        }
-
-        // --- 10秒ストップ（3秒以降は数字が隠れる。SOSは最後のアンケート） ---
-        function startStopwatchGame() {
-            const g = game;
-            let running = false, t0 = 0, raf = null, best = null;
-            setGameBody(`
-                <div class="game-big" id="sw-time" style="font-size:56px; font-variant-numeric:tabular-nums;">0.00</div>
-                <p class="game-note" id="sw-msg" style="text-align:center; min-height:20px;">スタートを押して、10.00秒だと思ったところでストップ</p>
-                <button class="game-choice" id="sw-btn">スタート</button>`);
-            const loop = () => {
-                const t = (performance.now() - t0) / 1000;
-                gameEl('sw-time').innerText = t < 3 ? t.toFixed(2) : '?.??';
-                raf = requestAnimationFrame(loop);
-            };
-            gameEl('sw-btn').onclick = () => {
-                if (game !== g || g.reported || g.finalShown) return;
-                if (!running) {
-                    running = true; t0 = performance.now(); loop();
-                    gameEl('sw-btn').innerText = 'ストップ'; gameEl('sw-msg').innerText = '';
-                } else {
-                    running = false; cancelAnimationFrame(raf);
-                    const t = (performance.now() - t0) / 1000, d = Math.abs(t - 10);
-                    const pts = Math.max(0, Math.round(100 - d * 100));
-                    if (best === null || pts > best) { best = pts; g.score = pts; setGameScore(`${g.score}点`); }
-                    gameEl('sw-time').innerText = t.toFixed(2);
-                    gameEl('sw-msg').innerText = `誤差 ${d.toFixed(2)} 秒（${pts}点）。もう一度挑戦できます`;
-                    gameEl('sw-btn').innerText = 'もう一度';
-                    sfx(pts >= 90 ? 'combo' : 'good');
-                }
-            };
-            g.cleanup.push(() => cancelAnimationFrame(raf));
-            setGameScore('0点');
         }
 
         // --- ジャンプアクション（横スクロール） ---
@@ -2332,96 +2001,6 @@
             }
             setGameScore('0点');
             requestAnimationFrame(frame);
-        }
-
-        // --- 利用規約に同意したい（5ステージ） ---
-        function startTermsGame() {
-            const g = game;
-            let stage = 0;
-            const STAGES = 3;
-            const order = shuffle([0, 1, 2, 3, 4]).slice(0, STAGES); // 5種類から毎回3つを選ぶ
-            const header = (title) => `<div class="game-note">ステージ ${stage + 1} / ${STAGES}</div><h3 style="margin:4px 0 10px;">${title}</h3>`;
-            const cleared = () => {
-                if (game !== g || g.reported || g.finalShown) return;
-                stage++;
-                g.score = stage * 10;
-                setGameScore(`${stage}/${STAGES} クリア`);
-                sfx('good');
-                if (stage >= STAGES) { g.score += 20; g.termsCleared = true; showSurvey('全ステージクリア！ 同意ありがとうございました'); return; }
-                renderStage();
-            };
-
-            function renderStage() {
-                if (order[stage] === 0) {
-                    // 最後までスクロールしないと同意できない
-                    const para = '第{n}条　利用者は、本サービスを利用するにあたり、本規約のすべてに同意したものとみなされますが、同意するためには本規約を最後まで読む必要があります。なお、本条は第{m}条の規定に優先し、第{m}条は本条に優先します。';
-                    let body = '';
-                    for (let i = 1; i <= 8; i++) body += `<p>${para.replace('{n}', i).replace(/\{m\}/g, i + 1)}</p>`;
-                    setGameBody(header('最後まで読んでください') + `<div class="terms-box" id="terms-scroll">${body}<p><b>― 以上 ―</b></p></div>
-                        <button id="terms-agree" class="game-choice" disabled>同意する</button>`);
-                    const box = gameEl('terms-scroll'), btn = gameEl('terms-agree');
-                    box.addEventListener('scroll', () => { if (box.scrollTop + box.clientHeight >= box.scrollHeight - 5) btn.disabled = false; });
-                    btn.onclick = cleared;
-                } else if (order[stage] === 1) {
-                    // 逃げる同意ボタン（4回逃げたらあきらめる）
-                    setGameBody(header('同意ボタンをつかまえろ') + `<div class="terms-arena" id="terms-arena"><button id="terms-run" style="left:40%; top:40%;">同意する</button></div>`);
-                    const arena = gameEl('terms-arena'), btn = gameEl('terms-run');
-                    let escapes = 0, fledAt = 0;
-                    const flee = (e) => {
-                        if (escapes >= 4) return;
-                        escapes++;
-                        fledAt = Date.now();
-                        e.preventDefault();
-                        btn.style.left = Math.random() * Math.max(0, arena.clientWidth - btn.offsetWidth) + 'px';
-                        btn.style.top = Math.random() * Math.max(0, arena.clientHeight - btn.offsetHeight) + 'px';
-                    };
-                    btn.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') flee(e); });
-                    btn.addEventListener('pointerdown', flee);
-                    // 逃げた直後のクリック（同じタップ）は無効にする
-                    btn.onclick = () => { if (escapes >= 4 && Date.now() - fledAt > 400) cleared(); };
-                } else if (order[stage] === 2) {
-                    // チェックすると別のチェックが外れるいたずらチェックボックス
-                    const labels = ['規約を読みました', '本当に読みました', '心から読みました', '読んだことに同意します', '同意したことに同意します'];
-                    setGameBody(header('ぜんぶチェックしてください') +
-                        labels.map((l, i) => `<label style="display:block; margin:8px 0; font-size:16px;"><input type="checkbox" class="terms-check" data-i="${i}" style="width:20px; height:20px; vertical-align:middle;"> ${l}</label>`).join('') +
-                        `<button id="terms-agree" class="game-choice" disabled>同意する</button>`);
-                    const checks = [...document.querySelectorAll('.terms-check')];
-                    const btn = gameEl('terms-agree');
-                    let tricks = 0;
-                    checks.forEach(c => c.addEventListener('change', () => {
-                        if (c.checked && tricks < 3 && Math.random() < 0.6) {
-                            const others = checks.filter(o => o !== c && o.checked);
-                            if (others.length) { pickRandom(others).checked = false; tricks++; }
-                        }
-                        btn.disabled = !checks.every(o => o.checked);
-                    }));
-                    btn.onclick = cleared;
-                } else if (order[stage] === 3) {
-                    // 「拒否する」に紛れた「拒否しない」ボタンを探す
-                    const render = (msg) => {
-                        const cells = Array(9).fill('<button class="terms-wrong" style="background:#e5484d;">拒否する</button>');
-                        cells[Math.floor(Math.random() * 9)] = '<button id="terms-ok" style="background:#e5484d;">拒否する<span style="font-size:9px;">しない</span></button>';
-                        setGameBody(header('「同意」ボタンはどれ？') + `<p class="game-note">${msg}</p><div class="terms-grid">${cells.join('')}</div>`);
-                        document.querySelectorAll('.terms-wrong').forEach(b => b.onclick = () => { sfx('bad'); render('それは本当に拒否するボタンです。並びが変わりました。'); });
-                        gameEl('terms-ok').onclick = cleared;
-                    };
-                    render('「拒否」しない、を探してください。');
-                } else {
-                    // 「ロボットではありません」パロディ：お寿司をぜんぶ選ぶ
-                    const pool = shuffle(['🍣', '🍣', '🍣', '🍙', '🍕', '🍔', '🍜', '🍰', '🍩']);
-                    setGameBody(header('お寿司をすべて選んでください') +
-                        `<div class="terms-grid">${pool.map((e, i) => `<button class="terms-tile" data-i="${i}">${e}</button>`).join('')}</div>
-                         <p class="game-note" id="terms-msg"></p><button id="terms-agree" class="game-choice">確認</button>`);
-                    const tiles = [...document.querySelectorAll('.terms-tile')];
-                    tiles.forEach(tl => tl.onclick = () => tl.classList.toggle('on'));
-                    gameEl('terms-agree').onclick = () => {
-                        const ok = tiles.every(tl => tl.classList.contains('on') === (tl.innerText === '🍣'));
-                        if (ok) cleared(); else { sfx('bad'); gameEl('terms-msg').innerText = 'ちがいます。もう一度！'; }
-                    };
-                }
-            }
-            setGameScore(`0/${STAGES} クリア`);
-            renderStage();
         }
 
         // --- 全体分析 & 個人別アドバイス生成ロジック ---
