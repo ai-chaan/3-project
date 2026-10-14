@@ -82,6 +82,21 @@
         .start-bar button { max-width: 520px; display: block; margin: 0 auto; box-shadow: 0 6px 16px rgba(47, 111, 237, 0.3); }
         .guest-wrap { max-width: 520px; margin: 0 auto; }
 
+
+        /* ===== 親機セットアップ（1ステップずつ） ===== */
+        .wizard .setup-grid { max-width: 520px; margin: 0 auto; grid-template-columns: minmax(0, 1fr) !important; gap: 0; }
+        .wizard .setup-col { display: block; }
+        .wizard .wiz-step { display: none; }
+        .wizard .wiz-step.active { display: block; }
+        .wiz-progress { max-width: 520px; margin: 0 auto 12px; display: flex; align-items: center; gap: 6px; }
+        .wiz-dot { flex: 1; height: 6px; border-radius: 3px; background: #dbe1ea; }
+        .wiz-dot.done { background: #a9c1f5; }
+        .wiz-dot.now { background: var(--primary); }
+        .wiz-count { font-size: 12px; color: var(--muted); font-weight: bold; white-space: nowrap; margin-left: 4px; }
+        .wizard .wiz-nav { display: flex; gap: 10px; max-width: 520px; margin: 0 auto; }
+        .wizard .wiz-nav button { flex: 1; max-width: none; margin: 0; box-shadow: 0 6px 16px rgba(47, 111, 237, 0.3); }
+        .wizard .wiz-nav .wiz-back { flex: 0 0 30%; background: #fff; color: var(--text); border: 1.5px solid var(--line); box-shadow: none; }
+
         /* 選択カード（ラジオ） */
         .option-card-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
         .option-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px; cursor: pointer; transition: border-color 0.15s, background 0.15s; line-height: 1.4; }
@@ -286,17 +301,18 @@
         </div>
 
         <!-- ホスト用パネル -->
-        <div id="host-panel">
+        <div id="host-panel" class="wizard">
+            <div class="wiz-progress" id="wiz-progress"></div>
             <div class="setup-grid">
                 <div class="setup-col">
-                    <section class="card">
+                    <section class="card wiz-step" data-step="1">
                         <h2><span class="step">1</span> ルーム情報</h2>
                         <label class="muted" for="host-my-name">あなたの名前</label>
                         <input type="text" id="host-my-name" value="ホスト(Aさん)">
                         <div class="muted" style="margin-top:10px;">招待コード（参加者に伝えてください）</div>
                         <span class="room-code-display" id="generated-code"></span>
                     </section>
-                    <section class="card">
+                    <section class="card wiz-step" data-step="2">
                         <h2><span class="step">2</span> 座席の配置</h2>
                         <div class="info-tip">マップの空いている所をタップして参加者を追加し、ドラッグで実際の席の位置に合わせてください。名前と配置は全員に同期されます。</div>
                         <div id="seat-map"></div>
@@ -304,7 +320,7 @@
                 </div>
 
                 <div class="setup-col">
-                    <section class="card">
+                    <section class="card wiz-step" data-step="3">
                         <h2><span class="step">3</span> 分析データの表示</h2>
                         <h3>見せ方</h3>
                         <div class="option-card-group" id="analysis-display-mode-group">
@@ -337,8 +353,8 @@
                 </div>
 
                 <div class="setup-col">
-                    <section class="card">
-                        <h2><span class="step">4</span> ミニゲームとSOS</h2>
+                    <section class="card wiz-step" data-step="4">
+                        <h2><span class="step">4</span> ミニゲーム</h2>
                         <div class="info-tip">ほかの人たちは話しているのに、1人だけ発言できていない状態が続くと、全員の画面で30秒ほどのミニゲームが始まります。盛り上がっている会話をいったん区切り、全員が入りやすい流れに戻すためです。ゲーム中にこっそりSOSも送れます。</div>
                         <h3>ミニゲーム</h3>
                         <div class="option-card-group" id="game-mode-group">
@@ -394,7 +410,10 @@
                             秒話せていなかったらゲーム開始
                         </div>
 
-                        <h3>「寂しいよ」ボタン</h3>
+                    </section>
+                    <section class="card wiz-step" data-step="5">
+                        <h2><span class="step">5</span> 「寂しいよ」ボタン</h2>
+                        <div class="info-tip">いつでも押せるボタンを画面に出すかどうかを選びます。ミニゲームを使う場合は、押す動作で誰か分かってしまうので「表示しない」がおすすめです。</div>
                         <div class="option-card-group" id="sos-button-group">
                             <label class="option-card">
                                 <input type="radio" name="sos-button" value="show" checked>
@@ -408,8 +427,9 @@
                     </section>
                 </div>
             </div>
-            <div class="start-bar">
-                <button class="btn-lg" onclick="startHostSystem()">▶ 親機としてシステム開始</button>
+            <div class="start-bar wiz-nav">
+                <button class="btn-lg wiz-back" id="wiz-back" onclick="wizardMove(-1)">戻る</button>
+                <button class="btn-lg" id="wiz-next" onclick="wizardMove(1)">次へ</button>
             </div>
         </div>
 
@@ -526,6 +546,25 @@
         function generateRoomCode() { return Math.random().toString(36).substring(2, 6).toUpperCase(); }
         document.getElementById('generated-code').innerText = generateRoomCode();
         
+        // 親機セットアップを1ステップずつ表示する
+        const WIZARD_LAST = 5;
+        let wizardStep = 1;
+        function showWizardStep(n) {
+            wizardStep = Math.max(1, Math.min(WIZARD_LAST, n));
+            document.querySelectorAll('#host-panel .wiz-step').forEach(el => el.classList.toggle('active', +el.dataset.step === wizardStep));
+            let dots = '';
+            for (let i = 1; i <= WIZARD_LAST; i++) dots += `<span class="wiz-dot ${i < wizardStep ? 'done' : i === wizardStep ? 'now' : ''}"></span>`;
+            document.getElementById('wiz-progress').innerHTML = dots + `<span class="wiz-count">${wizardStep} / ${WIZARD_LAST}</span>`;
+            document.getElementById('wiz-back').style.display = wizardStep === 1 ? 'none' : 'block';
+            document.getElementById('wiz-next').innerText = wizardStep === WIZARD_LAST ? '▶ 親機としてシステム開始' : '次へ';
+            window.scrollTo(0, 0);
+        }
+        function wizardMove(delta) {
+            if (delta > 0 && wizardStep === WIZARD_LAST) { startHostSystem(); return; }
+            showWizardStep(wizardStep + delta);
+        }
+        showWizardStep(1);
+
         function toggleMode() {
             const mode = document.querySelector('input[name="mode"]:checked').value;
             document.getElementById('host-panel').style.display = mode === 'host' ? 'block' : 'none';
