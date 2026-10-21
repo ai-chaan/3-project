@@ -262,11 +262,6 @@
         .quiz-choice.wrong, .quiz-choice.wrong:disabled { border-color: var(--danger); background: #fdecec; color: var(--danger); }
         .wolf-word { font-size: 40px; font-weight: bold; text-align: center; margin: 4px 0 14px; padding: 18px; background: #f3efff; color: var(--game); border-radius: 12px; }
         .wolf-word.hidden { color: transparent; text-shadow: 0 0 14px rgba(124, 77, 219, 0.5); }
-        .typing-romaji { text-align: center; font-size: 20px; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; font-family: ui-monospace, Menlo, monospace; }
-        .typing-romaji .typed { color: var(--primary); font-weight: bold; }
-        .typing-combo { text-align: center; font-weight: bold; color: #e08a1e; height: 22px; }
-        .typing-combo.pop { animation: combo-pop 0.3s ease-out; }
-        @keyframes combo-pop { from { transform: scale(1.5); } to { transform: scale(1); } }
         @media (max-width: 480px) { .quiz-choices { grid-template-columns: 1fr; } .game-intro-title { font-size: 24px; } }
 
         /* ===== タブレット ===== */
@@ -429,10 +424,6 @@
                             <label class="option-card">
                                 <input type="radio" name="game-mode" value="quiz" onchange="onGameModeChange()">
                                 <span><span class="option-title">早押しクイズ</span><br><span class="option-desc">全員に同じ問題が同時に出る4択クイズ。最後のアンケートでこっそりSOS</span></span>
-                            </label>
-                            <label class="option-card">
-                                <input type="radio" name="game-mode" value="typing" onchange="onGameModeChange()">
-                                <span><span class="option-title">⌨️ タイピング</span><br><span class="option-desc">ゲーム中に「sos」と打つとこっそりSOS</span></span>
                             </label>
                             <label class="option-card">
                                 <input type="radio" name="game-mode" value="runner" onchange="onGameModeChange()">
@@ -626,7 +617,7 @@
         let analysisDisplayMode = 'full';   // 'full' | 'simple' | 'hidden'
         let analysisVisibilityScope = 'all'; // 'all' | 'host'
         // ホストが設定するミニゲーム・SOSボタン設定
-        let gameMode = 'none';      // 'none' | 'typing' | 'runner' | 'terms' | 'random'
+        let gameMode = 'none';      // 'none' | 'runner' | 'terms' | 'random'
         let gameSilenceSec = 30;    // この秒数、1人だけ話せていなかったらゲーム開始
         let showSosButton = true;   // 「寂しいよ」ボタンを表示するか（全端末に同期）
         // ホストが設定するAI話題サポート設定（オン/オフは全端末に同期、APIキーは親機だけが持つ）
@@ -1583,9 +1574,6 @@
             runner: { title: 'ジャンプアクション', duration: 30,
                 how: 'タップ（スペースキー）でジャンプ、空中でもう一度タップで2段ジャンプ。コインを集めて、敵は上から踏むと高得点。だんだん速くなります。',
                 sos: '空に浮かぶ<b>SOSアイテム</b>を取ると、こっそりSOSが送れます。' },
-            typing: { title: 'タイピングバトル', duration: 30,
-                how: '表示されたことばをローマ字で入力。続けて正解するとコンボでボーナス。だんだん長いことばになります（英字キーボードに切り替えてね）。',
-                sos: 'ゲーム中に <b>sos</b> と入力すると、こっそりSOSが送れます。' },
             terms: { title: '利用規約に同意したい', duration: 30, final: true,
                 how: 'なかなか同意させてくれない利用規約を、3ステージ突破して同意しよう。',
                 sos: '最後のアンケートで「ちょっと話に入りにくい」を選ぶと、こっそりSOSが送れます。' }
@@ -1842,8 +1830,7 @@
                 sfx('start');
                 runGameClock(msg.durationSec);
                 startProgressReporter();
-                if (msg.gameType === 'typing') startTypingGame();
-                else if (msg.gameType === 'runner') startRunnerGame();
+                if (msg.gameType === 'runner') startRunnerGame();
                 else if (msg.gameType === 'quiz') startQuizGame(msg.questions || []);
                 else if (msg.gameType === 'wolf') startWolfGame(msg.wolfWords || {});
                 else if (msg.gameType === 'bomb') startBombGame(msg.bomb);
@@ -2380,86 +2367,6 @@
             };
             g.timers.push(setInterval(tick, 100));
             tick();
-        }
-
-        // --- タイピングバトル ---
-        // ※ ローマ字に "sos" を含む単語は入れないこと（SOSと誤判定されるため）
-        const TYPING_TIERS = [
-            [['ねこ', 'neko'], ['いぬ', 'inu'], ['うみ', 'umi'], ['やま', 'yama'], ['そら', 'sora'], ['かぜ', 'kaze'],
-             ['ほし', 'hoshi'], ['はな', 'hana'], ['くも', 'kumo'], ['あめ', 'ame'], ['もり', 'mori'], ['ゆき', 'yuki']],
-            [['さくら', 'sakura'], ['すいか', 'suika'], ['りんご', 'ringo'], ['とけい', 'tokei'], ['はなび', 'hanabi'], ['くじら', 'kujira'],
-             ['ぷりん', 'purin'], ['かいぎ', 'kaigi'], ['いけん', 'iken'], ['でんしゃ', 'densha'], ['ぺんぎん', 'pengin'], ['おにぎり', 'onigiri'],
-             ['たいよう', 'taiyou'], ['ひこうき', 'hikouki']],
-            [['ゆきだるま', 'yukidaruma'], ['ともだち', 'tomodachi'], ['しつもん', 'shitsumon'], ['えんぴつ', 'enpitsu'], ['たこやき', 'takoyaki'],
-             ['かんらんしゃ', 'kanransha'], ['ちょこれーと', 'chokore-to'], ['じてんしゃ', 'jitensha'], ['ほっかいどう', 'hokkaidou'],
-             ['あいすくりーむ', 'aisukuri-mu'], ['ぷれぜんてーしょん', 'purezente-shon'], ['ふぁしりてーたー', 'fashirite-ta-']]
-        ];
-        // ヘボン式／訓令式どちらで打っても正解にする
-        function normalizeRomaji(s) {
-            return s.normalize('NFKC').toLowerCase().replace(/\s/g, '').replace(/ー/g, '-')
-                .replace(/shi/g, 'si').replace(/chi/g, 'ti').replace(/tsu/g, 'tu').replace(/fu/g, 'hu')
-                .replace(/ji/g, 'zi').replace(/sh([auo])/g, 'sy$1').replace(/ch([auo])/g, 'ty$1').replace(/j([auo])/g, 'zy$1')
-                .replace(/nn/g, 'n');
-        }
-
-        function startTypingGame() {
-            const g = game;
-            let word = null, cleared = 0, combo = 0;
-            setGameBody(`
-                <div class="typing-combo" id="typing-combo">&nbsp;</div>
-                <div class="game-intro-title" id="typing-kana" style="font-size:38px;"></div>
-                <div class="typing-romaji" id="typing-romaji"></div>
-                <input type="text" id="typing-input" class="game-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" lang="en" placeholder="ローマ字で入力">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-                    <span class="game-note" id="game-sos-ack"></span>
-                    <button id="typing-skip" style="background:#94a3b8; font-size:14px; padding:6px 14px; margin:0;">とばす</button>
-                </div>`);
-            const input = gameEl('typing-input');
-            const renderRomaji = (typed) => {
-                // 入力済みの部分を色付けする（表示どおりのつづりで打っている場合）
-                let n = 0;
-                while (n < typed.length && n < word[1].length && typed[n] === word[1][n]) n++;
-                gameEl('typing-romaji').innerHTML = `<span class="typed">${escapeHtml(word[1].slice(0, n))}</span>${escapeHtml(word[1].slice(n))}`;
-            };
-            const nextWord = () => {
-                const tier = TYPING_TIERS[cleared < 3 ? 0 : cleared < 6 ? 1 : 2];
-                let w;
-                do { w = pickRandom(tier); } while (word && w[0] === word[0]);
-                word = w;
-                gameEl('typing-kana').innerText = w[0];
-                input.value = '';
-                renderRomaji('');
-            };
-            const showCombo = () => {
-                const el = gameEl('typing-combo');
-                el.innerText = combo >= 2 ? `${combo} コンボ！` : ' ';
-                el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
-            };
-            input.addEventListener('input', () => {
-                if (game !== g || g.reported) return;
-                const raw = input.value.normalize('NFKC').toLowerCase().trim();
-                if (raw.includes('sos')) {
-                    g.sos = true;
-                    input.value = '';
-                    renderRomaji('');
-                    quietSosAck();
-                    return;
-                }
-                if (raw === word[0] || normalizeRomaji(raw) === normalizeRomaji(word[1])) {
-                    cleared++; combo++;
-                    g.score += word[1].length + Math.min(combo - 1, 5) * 2; // 長いことば＋コンボほど高得点
-                    setGameScore(`${g.score}点`);
-                    sfx(combo >= 3 ? 'combo' : 'coin');
-                    showCombo();
-                    nextWord();
-                    return;
-                }
-                renderRomaji(raw);
-            });
-            gameEl('typing-skip').onclick = () => { combo = 0; showCombo(); nextWord(); input.focus(); };
-            setGameScore('0点');
-            nextWord();
-            input.focus();
         }
 
         // --- ジャンプアクション（横スクロール） ---
