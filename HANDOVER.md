@@ -22,6 +22,7 @@
 ├── index.html                           # メインアプリケーション（親機・子機兼用、視線・発話検知、P2P同期、リアルタイム集計）
 ├── dashboard_for_ai_facilitator.html   # 管理者/ファシリテーター用 リアルタイム会話分析ダッシュボード (Chart.js + Tailwind)
 ├── server.js                            # ローカル開発用PeerJSシグナリングサーバー (Node.js / peer)
+├── sw.js                                # ゲーム開始の通知を出すための Service Worker（Android の Chrome 用）
 ├── package.json                         # 依存関係定義 (peer, ws)
 ├── package-lock.json
 ├── HANDOVER.md                          # 本引き継ぎ資料
@@ -64,14 +65,14 @@
 | `game_progress` | 各端末 ➜ ホスト | `{ gameId, name, score }` | プレイ中のスコア（変化したときだけ約0.7秒ごと） |
 | `game_scores` | ホスト ➜ 全員 | `{ gameId, scores }` | 全員のスコアボード（1秒ごと） |
 | `game_result` | 各端末 ➜ ホスト | `{ gameId, name, score, sos, vote }` | ゲーム終了時のスコアとSOS有無（ワードウルフは投票先も）。SOSは押した瞬間ではなくここでまとめて送る |
-| `game_end` | ホスト ➜ 全員 | `{ gameId, gameType, ranking, sos, prompt, headline, details }` | 結果発表。SOSは「誰からか」を含めず有無だけを配信 |
+| `game_end` | ホスト ➜ 全員 | `{ gameId, gameType, ranking, sos, prompt, headline, details, talkTarget }` | 結果発表。SOSは「誰からか」を含めず有無だけを配信。`talkTarget` は話を振る相手（下の「ゲーム後の話を振る提案」） |
 | `bomb_action` | 解除係の端末 ➜ ホスト | `{ gameId, module, value }` | ナイショの爆弾で、線を切る・ボタンを押す操作。判定は親機だけが行う |
 | `bomb_state` | ホスト ➜ 全員 | `{ gameId, event, value, module, current, strikes, progress, over, teamScore }` | 判定結果。`event` は `solved` / `strike` / `progress`、`over` は `cleared` / `exploded` / `null` |
 | `transcript` | 各端末 ➜ ホスト ➜ 全員 | `{ name, text, ts, fromPeerId }` | 文字起こしをオンにした人の発言（確定した1文ごと） |
 | `session_report` | ホスト ➜ 全員 | `{ report }` | ふりかえりレポートのデータ（分析を「みんなに見せる」設定で、かつ「見せない」でないときだけ送る） |
 | `ai_bridge` | ホスト ➜ 話せていない人以外 | `{ target, questions, source, ts }` | AI話題サポートの質問。`source` は `'ai'`（Claudeが生成）か `'template'`（簡易モード）。`target` 本人には送らない |
 
-`room_seats_sync` には `analysisDisplayMode` / `analysisVisibilityScope` / `showSosButton`（「寂しいよ」ボタンの表示有無）/ `aiBridgeEnabled`（AI話題サポートのオン/オフ）も含まれます。
+`room_seats_sync` には `gameEnabled`（ミニゲームを使う部屋か。お知らせ設定の表示に使う）/ `analysisDisplayMode` / `analysisVisibilityScope` / `showSosButton`（「寂しいよ」ボタンの表示有無）/ `aiBridgeEnabled`（AI話題サポートのオン/オフ）も含まれます。
 
 ### ミニゲーム（こっそりSOS）
 目的は、2人だけで会話が盛り上がり1人が入れていないときに、ゲームで流れをいったん区切ることです。
@@ -94,6 +95,20 @@
 - **部品（3つを順に解除）**: ワイヤー（4本の色。上から順に確認する4つのルールのうち最初に当てはまるもの）→ 記号パネル（説明しにくい記号4つを、マニュアルの番号順に押す。間違えると最初から）→ ことばのボタン（「きょう/きよう」など聞き間違えやすいことばと、「はい/ハイ」など聞いただけでは区別しにくいボタン）。問題は毎回ランダムに作ります（`buildBomb`）。
 - **進行**: ミスで残り時間 −5秒、3回ミスで爆発。全部解除すると早めに終わります。チームの点数は「解除数×10＋（成功時の残り秒数）」で全員共通。結果画面は順位を出さず（`hideRanking`）、ゲーム中の発言バランススコアを出します。
 - 正解は親機だけが持ち（`hostGame.bomb.answers`）、子機に配るデータには含めません。
+
+#### 集計（結果発表まで）
+親機は、ゲーム開始時にいて今も接続している全員から `game_result` が届いた時点ですぐ結果を配信します。タブを急に閉じた人は切断が分かるまで時間がかかるため、`state_update` が5秒（`PLAYER_STALE_MS`）届いていない人は待ちません（ゲームのきっかけ判定・話を振る相手の候補からも外します）。子機は結果が20秒（`RESULT_WAIT_LIMIT_SEC`）届かなければ「会話にもどる」を出します。結果を配信したあと60秒（`GAME_COOLDOWN_SEC`）は次のゲームを始めません。
+
+#### ゲーム開始のお知らせ
+会話中は画面を見ていないことが多いため、ゲームが始まると音・バイブ・画面の点滅で知らせ、本編が始まるときにも短く震わせます。タブが裏にあるときはシステム通知も出します（Android の Chrome は `new Notification()` が使えないので `sw.js` 経由）。設定は「あなたの状況」カードのスイッチで、端末ごとに `localStorage` の `gameAlert` に保存します。音の再生と通知の許可はブラウザが利用者の操作を必要とするため、システム開始ボタンを押したときに準備します。
+- バイブは iPhone の Safari では使えません。iPhone の通知はホーム画面に追加したWebアプリでしか出ません。
+- 画面をロックするとブラウザ自体が止まるため、お知らせも届きません。
+
+#### ゲーム後の話を振る提案
+結果発表のトークタイムで「〇〇さんに話を振ってみよう」と、お題を聞く相手を出します。相手は**ゲーム開始の時点でいちばん長く話せていなかった人**（同じなら累積発話が短い人。爆弾の「見る人」と同じ考え方）で、接続中の2人以上のときだけ選びます。
+- 相手の本人の画面には名前を出さず、ふつうのトークタイムを表示します。
+- 「会話にもどる」を押したあともアドバイス欄の下にカードを残し、60秒たつか、相手が3秒話したら消します。
+- 名前が「さん」「先生」などで終わる場合は「さん」を付けません（`withHonorific`）。
 
 最後の投票・アンケートは全員が必ず何か押すので、押す動作から特定できません。CSVには「ミニゲーム記録」（SOS数のみ）を出力します。効果音はゲーム画面右上のボタンでオン/オフでき、設定は端末ごとに保存されます。
 
