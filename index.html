@@ -200,6 +200,12 @@
         .game-panel { background: white; border-radius: 16px; width: 100%; max-width: 680px; max-height: 100%; overflow-y: auto; padding: 18px; text-align: left; }
         .game-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: bold; border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 14px; }
         .game-header #game-timer { background: #fff1de; color: #c96f0c; padding: 3px 10px; border-radius: 999px; font-size: 13px; }
+        .nudge-box { margin-top: 12px; background: #eef4ff; border-left: 5px solid var(--primary); border-radius: 12px; padding: 12px 14px; }
+        .nudge-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: bold; font-size: 17px; }
+        .nudge-head button { width: auto; margin: 0; padding: 2px 10px; background: transparent; color: var(--muted); font-size: 18px; }
+        .nudge-prompt { font-size: 16px; margin-top: 6px; line-height: 1.6; }
+        .game-overlay.alerting .game-panel { animation: game-alert-pulse 0.5s ease-in-out 3; }
+        @keyframes game-alert-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(245, 165, 36, 0); } 50% { box-shadow: 0 0 0 10px rgba(245, 165, 36, 0.9); } }
         .game-overlay canvas { border-radius: 10px; touch-action: none; }
         .game-overlay button { width: auto; }
         .game-note { font-size: 13px; color: var(--muted); }
@@ -531,6 +537,13 @@
                         <div class="status-item" id="my-audio">発言量: 判定中...</div>
                     </div>
                 </div>
+                <div id="game-alert-row" style="display:none; margin-top:12px;">
+                    <label class="switch-row">
+                        <span><span class="option-title">ゲーム開始をお知らせ</span><br><span class="muted" style="font-size:12px;">音・バイブ・通知で知らせます</span></span>
+                        <input type="checkbox" id="game-alert-toggle" onchange="toggleGameAlert(this.checked)">
+                    </label>
+                    <div id="game-alert-status" class="muted" style="font-size:12px; margin-top:4px;"></div>
+                </div>
             </section>
         </div>
 
@@ -538,6 +551,13 @@
             <section class="card advice-card">
                 <h2>AIからのアドバイス</h2>
                 <div class="global-alert" id="parent-command-alert">AIが会話のバランスを分析中です...</div>
+                <div id="talk-nudge" class="nudge-box" style="display:none;">
+                    <div class="nudge-head">
+                        <span id="talk-nudge-title"></span>
+                        <button onclick="hideTalkNudge()" aria-label="閉じる">×</button>
+                    </div>
+                    <div class="nudge-prompt" id="talk-nudge-prompt"></div>
+                </div>
                 <div id="host-game-controls" style="display:none; margin-top:12px;">
                     <div id="game-next-label" class="muted"></div>
                     <button class="btn-game" onclick="startGameForAll()">今すぐミニゲームを始める</button>
@@ -607,6 +627,7 @@
         let gameMode = 'none';      // 'none' | 'quiz' | 'runner' | 'random'
         let gameSilenceSec = 30;    // この秒数、1人だけ話せていなかったらゲーム開始
         let showSosButton = true;   // 「寂しいよ」ボタンを表示するか（全端末に同期）
+        let gameEnabled = false;    // ミニゲームを使う部屋か（全端末に同期。お知らせ設定の表示に使う）
         let isSpeaking = false, currentLookTarget = "正面", currentFaceRatio = 0.5;
         let speakDurationSeconds = 0, lookDurationSeconds = 0, lastLookTarget = "正面";
         let registeredTargets = [{ name: "正面", ratio: 0.5 }];
@@ -682,7 +703,7 @@
 
         // 親機 ➜ 子機へ送る座席・表示設定
         function roomSettingsMessage() {
-            return { type: 'room_seats_sync', seats: masterSeats, analysisDisplayMode: analysisDisplayMode, analysisVisibilityScope: analysisVisibilityScope, showSosButton: showSosButton };
+            return { type: 'room_seats_sync', seats: masterSeats, analysisDisplayMode: analysisDisplayMode, analysisVisibilityScope: analysisVisibilityScope, showSosButton: showSosButton, gameEnabled: gameMode !== 'none' };
         }
 
         // --- ホスト用座席配置マップレンダリング & ドラッグ実装（マウス・タッチ両対応） ---
@@ -825,6 +846,9 @@
             showSosButton = document.querySelector('input[name="sos-button"]:checked').value === 'show';
             applySosButtonVisibility();
             document.getElementById('host-game-controls').style.display = gameMode === 'none' ? 'none' : 'block';
+            gameEnabled = gameMode !== 'none';
+            applyGameAlertVisibility();
+            prepareGameAlert();
 
             document.getElementById('host-report-controls').style.display = 'block';
             document.getElementById('report-share-note').innerText = reportSharedWithGuests()
@@ -882,6 +906,7 @@
         async function startGuestSystem() {
             if (!selectedGuestSeat) return alert("あなたの座席を選択してください");
             myName = selectedGuestSeat.name;
+            prepareGameAlert();
 
             setupRegisteredTargetsFor(selectedGuestSeat, masterSeats);
 
@@ -1067,6 +1092,7 @@
                     delete connections[conn.peer];
                     const nameToRemove = Object.keys(hostGlobalState).find(name => hostGlobalState[name].peerId === conn.peer);
                     if (nameToRemove) delete hostGlobalState[nameToRemove];
+                    finishGameIfAllReported();
                     updateConnectionStatus(`ゲスト離脱 (${Object.keys(connections).length}名接続中)`);
                 });
             } else {
@@ -1190,6 +1216,10 @@
                         showSosButton = msg.showSosButton;
                         applySosButtonVisibility();
                     }
+                    if (typeof msg.gameEnabled === 'boolean') {
+                        gameEnabled = msg.gameEnabled;
+                        applyGameAlertVisibility();
+                    }
                     // 既にスタート後ならターゲット比率を再計算
                     if (selectedGuestSeat) {
                         const updatedMySeat = masterSeats.find(s => s.id === selectedGuestSeat.id) || selectedGuestSeat;
@@ -1199,7 +1229,7 @@
             }
             else if (msg.type === 'state_update') {
                 if (myRole === 'parent') {
-                    hostGlobalState[msg.name] = { ...msg.payload, peerId: msg.peerId };
+                    hostGlobalState[msg.name] = { ...msg.payload, peerId: msg.peerId, lastSeenAt: Date.now() };
                     const users = Object.values(hostGlobalState);
                     analyzeGlobalStateAndCommand(users); 
                 }
@@ -1220,6 +1250,7 @@
                 const timerEl = document.getElementById('meeting-timer');
                 if (timerEl) timerEl.innerText = `経過: ${mm}:${ss}`;
                 cumulativeStats = msg.cumulativeStats || {};
+                checkTalkNudgeDone();
                 renderAnalysisDashboard(msg.users || []);
                 liveBalanceScore = msg.balanceScore ?? null;
                 interventions = msg.interventions || [];
@@ -1296,6 +1327,7 @@
                     });
 
                     renderAnalysisDashboard(users);
+                    checkTalkNudgeDone();
                     hostGameTick();
                     updateBalanceAndEffects();
 
@@ -1562,6 +1594,7 @@
         const GAME_COOLDOWN_SEC = 60; // ゲームが終わってすぐ次が始まらないようにする間隔
         const GAME_TALKING_RECENT_SEC = 5; // この秒数以内に話した人を「いま話している人」とみなす
         const GAME_GRACE_SEC = 4;  // 結果が届くのを親機が待つ余裕
+        const RESULT_WAIT_LIMIT_SEC = 20; // 子機が結果発表を待つ上限
         const TALK_PROMPTS = [
             'ここまでの話で、いちばん印象に残った意見は？',
             'いまの議論で、まだ話せていないことは？',
@@ -1604,23 +1637,107 @@
             good: [[659, 0.08], [880, 0.14]], bad: [[220, 0.2]], combo: [[784, 0.05], [988, 0.05], [1319, 0.1]],
             start: [[523, 0.1], [659, 0.1], [784, 0.18]], sos: [[700, 0.04]]
         };
-        function sfx(kind) {
-            if (!gameSoundOn || !SFX[kind]) return;
+        function audioCtx() {
+            sfxCtx = sfxCtx || new (window.AudioContext || window.webkitAudioContext)();
+            if (sfxCtx.state === 'suspended') sfxCtx.resume(); // ブラウザは操作があるまで音を止めているため
+            return sfxCtx;
+        }
+        function playTones(tones, volume, wave) {
             try {
-                sfxCtx = sfxCtx || new (window.AudioContext || window.webkitAudioContext)();
-                if (sfxCtx.state === 'suspended') sfxCtx.resume(); // ブラウザは操作があるまで音を止めているため
-                let t = sfxCtx.currentTime;
-                SFX[kind].forEach(([freq, dur]) => {
-                    const osc = sfxCtx.createOscillator(), gain = sfxCtx.createGain();
-                    osc.type = (kind === 'hit' || kind === 'bad') ? 'square' : 'triangle';
+                const ctx = audioCtx();
+                let t = ctx.currentTime;
+                tones.forEach(([freq, dur]) => {
+                    const osc = ctx.createOscillator(), gain = ctx.createGain();
+                    osc.type = wave;
                     osc.frequency.value = freq;
-                    gain.gain.setValueAtTime(0.05, t);
+                    gain.gain.setValueAtTime(volume, t);
                     gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
-                    osc.connect(gain).connect(sfxCtx.destination);
+                    osc.connect(gain).connect(ctx.destination);
                     osc.start(t); osc.stop(t + dur);
                     t += dur;
                 });
             } catch (e) {}
+        }
+        function sfx(kind) {
+            if (!gameSoundOn || !SFX[kind]) return;
+            playTones(SFX[kind], 0.05, (kind === 'hit' || kind === 'bad') ? 'square' : 'triangle');
+        }
+
+        // --- ゲーム開始のお知らせ（音・バイブ・通知。端末ごとに保存） ---
+        //   会話中は画面を見ていないことが多いので、始まった瞬間に気づけるようにする。
+        //   バイブは Android の Chrome など対応ブラウザのみ（iPhone の Safari は非対応）。
+        //   通知はタブが裏にあるときだけ出す。Android は Service Worker 経由でないと出せないため sw.js を登録する。
+        const GAME_ALERT_TONES = [[880, 0.12], [1175, 0.12], [1568, 0.22], [0.0001, 0.12], [880, 0.12], [1175, 0.12], [1568, 0.3]];
+        const GAME_ALERT_VIBRATE = [300, 120, 300, 120, 500];
+        let gameAlertOn = (() => { try { return localStorage.getItem('gameAlert') !== 'off'; } catch (e) { return true; } })();
+        let swRegistration = null;
+        const titleBeforeAlert = document.title;
+
+        function applyGameAlertVisibility() {
+            const row = document.getElementById('game-alert-row');
+            if (row) row.style.display = gameEnabled ? 'block' : 'none';
+            const toggle = document.getElementById('game-alert-toggle');
+            if (toggle) toggle.checked = gameAlertOn;
+            updateGameAlertStatus();
+        }
+
+        function updateGameAlertStatus() {
+            const el = document.getElementById('game-alert-status');
+            if (!el) return;
+            if (!gameAlertOn) { el.innerText = 'オフ（ゲームは画面に出るだけです）'; return; }
+            const vib = 'vibrate' in navigator ? 'バイブ ○' : 'バイブ ×（この端末は非対応）';
+            let notice;
+            if (!('Notification' in window)) notice = '通知 ×（このブラウザは非対応）';
+            else if (Notification.permission === 'granted') notice = '通知 ○（別のタブやアプリを見ているとき）';
+            else if (Notification.permission === 'denied') notice = '通知 ×（ブラウザの設定で許可してください）';
+            else notice = '通知 －（オンにし直すと許可を聞きます）';
+            el.innerText = `音 ○・${vib}・${notice}`;
+        }
+
+        // ボタンを押した操作の中で呼ぶ（音の再生・通知の許可は、利用者の操作がないとブラウザが止めるため）
+        function prepareGameAlert() {
+            if (!gameAlertOn || !gameEnabled) return;
+            try { audioCtx(); } catch (e) {}
+            if ('serviceWorker' in navigator && window.isSecureContext && !swRegistration) {
+                navigator.serviceWorker.register('sw.js').then(reg => { swRegistration = reg; }).catch(e => console.warn('[sw] 登録に失敗:', e));
+            }
+            if ('Notification' in window && Notification.permission === 'default') {
+                try { Notification.requestPermission().then(updateGameAlertStatus); } catch (e) {}
+            }
+        }
+
+        function toggleGameAlert(on) {
+            gameAlertOn = on;
+            try { localStorage.setItem('gameAlert', on ? 'on' : 'off'); } catch (e) {}
+            if (on) {
+                prepareGameAlert();
+                playTones(GAME_ALERT_TONES.slice(0, 3), 0.15, 'sine'); // 試しに鳴らす
+                try { if (navigator.vibrate) navigator.vibrate(200); } catch (e) {}
+            }
+            updateGameAlertStatus();
+        }
+
+        function alertGameStart(title) {
+            if (!gameAlertOn) return;
+            playTones(GAME_ALERT_TONES, 0.15, 'sine');
+            try { if (navigator.vibrate) navigator.vibrate(GAME_ALERT_VIBRATE); } catch (e) {}
+            const overlay = gameEl('game-overlay');
+            overlay.classList.remove('alerting'); void overlay.offsetWidth; overlay.classList.add('alerting');
+            if (document.hidden) {
+                document.title = '🎮 ゲーム開始！';
+                showSystemNotification('ミニゲームが始まりました', `「${title}」が始まります。画面にもどってください。`);
+            }
+        }
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) document.title = titleBeforeAlert; });
+
+        function showSystemNotification(title, body) {
+            if (!('Notification' in window) || Notification.permission !== 'granted') return;
+            const options = { body: body, tag: 'potsun-game', renotify: true, vibrate: GAME_ALERT_VIBRATE };
+            if (swRegistration) { swRegistration.showNotification(title, options).catch(() => {}); return; }
+            try {
+                const n = new Notification(title, options);
+                n.onclick = () => { window.focus(); n.close(); };
+            } catch (e) {} // Android の Chrome は Service Worker なしだと出せない
         }
         function updateSoundButton() { const b = gameEl('game-sound'); if (b) b.innerText = gameSoundOn ? '音 ON' : '音 OFF'; }
         function toggleGameSound() {
@@ -1629,16 +1746,25 @@
             updateSoundButton();
         }
 
+        // タブを急に閉じた人は、接続が切れたと分かるまで時間がかかる。
+        // 状態（0.5秒ごと）がしばらく届いていない人は、いないものとして扱う
+        const PLAYER_STALE_MS = 5000;
+        function isPresent(name) {
+            const u = hostGlobalState[name];
+            return !!u && Date.now() - (u.lastSeenAt || 0) < PLAYER_STALE_MS;
+        }
+
         // --- 親機: 開始・途中経過・集計 ---
         function hostGameTick() {
             if (gameMode === 'none') return;
             const label = document.getElementById('game-next-label');
-            const users = Object.values(hostGlobalState);
+            const users = Object.values(hostGlobalState).filter(u => isPresent(u.name));
             users.forEach(u => {
                 if (lastSpokeAtSec[u.name] === undefined || u.speaking) lastSpokeAtSec[u.name] = meetingElapsedSeconds;
             });
             if (hostGame) {
                 if (label) label.innerText = 'ミニゲーム中...';
+                finishGameIfAllReported(); // 途中で抜けた人の結果は待たない
                 // 途中経過のスコアを全員へ配信（1秒ごと）
                 if (Object.keys(hostGame.live).length > 0) {
                     const msg = { type: 'game_scores', gameId: hostGame.id, scores: hostGame.live };
@@ -1659,14 +1785,13 @@
 
         // ゲーム後は全員の「話せていない時間」をリセットし、しばらくは次のゲームを始めない
         function resetGameTrigger() {
-            Object.keys(lastSpokeAtSec).forEach(name => { lastSpokeAtSec[name] = meetingElapsedSeconds; });
-            Object.keys(aiLastSpokeAtSec).forEach(name => { aiLastSpokeAtSec[name] = meetingElapsedSeconds; });
             gameCooldownUntilSec = meetingElapsedSeconds + GAME_COOLDOWN_SEC;
+            Object.keys(lastSpokeAtSec).forEach(name => { lastSpokeAtSec[name] = meetingElapsedSeconds; });
         }
 
         function startGameForAll() {
             if (myRole !== 'parent' || hostGame || gameMode === 'none') return;
-            const players = Object.keys(hostGlobalState);
+            const players = Object.keys(hostGlobalState).filter(isPresent);
             let candidates = gameMode === 'random' ? GAME_TYPES.slice() : [gameMode];
             // 爆弾は2人以上で役割を分けるゲームなので、ランダムのときは1人なら外す
             if (gameMode === 'random' && players.length < 2) candidates = candidates.filter(t => t !== 'bomb');
@@ -1684,6 +1809,7 @@
             }
             const waitSec = introSec + info.duration + (info.final ? GAME_FINAL_SEC : 0) + GAME_GRACE_SEC;
             hostGame = { id: msg.gameId, gameType: gameType, players: players, results: {}, live: {}, bomb: bombHost,
+                         spokeAtStart: { ...lastSpokeAtSec },
                          startElapsed: meetingElapsedSeconds, timer: setTimeout(finishGameForAll, waitSec * 1000),
                          interventionId: recordIntervention('game', `ミニゲーム（${info.title}）`, true) };
             broadcastToGuests(msg);
@@ -1699,9 +1825,32 @@
             if (!hostGame || msg.gameId !== hostGame.id) return;
             hostGame.results[msg.name] = { score: msg.score || 0, sos: !!msg.sos, vote: msg.vote || null };
             hostGame.live[msg.name] = msg.score || 0;
-            // 参加中の全員から結果が届いたら待たずに終了
-            const players = Object.keys(hostGlobalState);
-            if (players.length > 0 && players.every(name => hostGame.results[name])) finishGameForAll();
+            finishGameIfAllReported();
+        }
+
+        // ゲーム開始時にいて、いまも接続している全員から結果が届いたら待たずに終了する。
+        // 途中で入った人・抜けた人は待たない（待つと集計が時間切れまで終わらないため）
+        function finishGameIfAllReported() {
+            if (!hostGame) return;
+            // まだ誰も結果を送っていないうちは終えない（全員が抜けて待つ人がいなくなった場合を除く）
+            const waiting = hostGame.players.filter(isPresent);
+            if (Object.keys(hostGame.results).length === 0 && waiting.length > 0) return;
+            if (waiting.every(name => hostGame.results[name])) finishGameForAll();
+        }
+
+        // ゲームのあとに話を振る相手 = ゲーム開始の時点でいちばん長く話せていなかった人
+        // （同じなら累積発話が短い人）。いま接続している2人以上のときだけ選ぶ
+        // 「Bさん」「先生」など敬称つきで登録された名前に「さん」を重ねない
+        function withHonorific(name) {
+            return /(さん|くん|君|ちゃん|様|さま|先生|氏)\)?$/.test(name) ? name : `${name}さん`;
+        }
+
+        function pickTalkTarget(players, spokeAt) {
+            const present = players.filter(isPresent);
+            if (present.length < 2) return null;
+            const talkSec = (n) => (cumulativeStats[n] ? cumulativeStats[n].totalSpeakSeconds : 0);
+            return present.slice().sort((a, b) =>
+                ((spokeAt[a] ?? 0) - (spokeAt[b] ?? 0)) || (talkSec(a) - talkSec(b)))[0];
         }
 
         function finishGameForAll() {
@@ -1729,7 +1878,8 @@
             closeIntervention(hostGame.interventionId, sosCount > 0 ? '・SOSあり' : '');
             const msg = {
                 type: 'game_end', gameId: hostGame.id, gameType: hostGame.gameType, ranking: ranking,
-                sos: sosCount > 0, prompt: prompt, headline: headline, details: details, hideRanking: hideRanking
+                sos: sosCount > 0, prompt: prompt, headline: headline, details: details, hideRanking: hideRanking,
+                talkTarget: pickTalkTarget(hostGame.players, hostGame.spokeAtStart)
             };
             hostGame = null;
             resetGameTrigger();
@@ -1754,6 +1904,8 @@
         function startLocalGame(msg) {
             if (!myName) return; // まだ座席を選んでいない端末は参加しない
             stopLocalGame();
+            hideTalkNudge();
+            pendingTalkNudge = null;
             const info = GAME_INFO[msg.gameType];
             if (!info) return;
             game = { id: msg.gameId, gameType: msg.gameType, players: msg.players || [], score: 0, sos: false, vote: null,
@@ -1762,6 +1914,7 @@
             gameEl('game-title').innerText = info.title;
             setGameScore('');
             updateSoundButton();
+            alertGameStart(info.title);
 
             // 説明 → カウントダウン → 本編
             let left = msg.introSec;
@@ -1780,6 +1933,7 @@
                 if (left > 0) { renderIntro(); return; }
                 clearInterval(iv);
                 sfx('start');
+                if (gameAlertOn) { try { if (navigator.vibrate) navigator.vibrate(150); } catch (e) {} }
                 runGameClock(msg.durationSec);
                 startProgressReporter();
                 if (msg.gameType === 'runner') startRunnerGame();
@@ -1852,6 +2006,12 @@
                 <p style="text-align:center;">あなたのスコア：<b style="font-size:22px;">${game.score}</b></p>
                 <p class="game-note" style="text-align:center;">みんなの結果を集計しています...</p>`);
             sendToHost({ type: 'game_result', gameId: game.id, name: myName, score: game.score, sos: game.sos, vote: game.vote });
+            // 親機から結果が届かないまま待ち続けないよう、しばらくしたら会話にもどれるようにする
+            gameLater(() => {
+                setGameBody(`<div class="game-intro-title">おつかれさま！</div>
+                    <p class="game-note" style="text-align:center;">結果が届きませんでした。会話にもどりましょう。</p>
+                    <button class="game-choice" onclick="closeGameOverlay()">会話にもどる</button>`);
+            }, RESULT_WAIT_LIMIT_SEC * 1000);
         }
 
         // SOSを受け付けたことを本人にだけ小さく知らせる（目立たないように数秒で消す）
@@ -1911,7 +2071,15 @@
                 </div>`).join('') || '<p class="game-note">結果が届きませんでした</p>';
             const headlineHtml = msg.headline ? `<div class="result-headline">${escapeHtml(msg.headline)}</div>` : '';
             const detailsHtml = (msg.details || []).map(d => `<div class="game-note" style="font-size:14px;">${escapeHtml(d)}</div>`).join('');
+            // 話を振る相手の本人には名前を出さない（指名されていると感じて話しにくくならないように）
+            const target = msg.talkTarget && msg.talkTarget !== myName ? msg.talkTarget : null;
             const first = (ranking[0] && !msg.hideRanking) ? `1位の ${escapeHtml(ranking[0].name)} から` : 'だれかから';
+            const talkHtml = target
+                ? `<b>💬 ${escapeHtml(withHonorific(target))}に話を振ってみよう</b><br>「${escapeHtml(msg.prompt || '')}」<br>まずは ${escapeHtml(withHonorific(target))}に聞いてみよう。`
+                : msg.talkTarget
+                    ? `<b>トークタイム</b><br>「${escapeHtml(msg.prompt || '')}」<br>みんなで一言ずつ話してみよう。`
+                    : `<b>トークタイム</b><br>「${escapeHtml(msg.prompt || '')}」<br>${first}時計回りに一言ずつ話してみよう。`;
+            pendingTalkNudge = target ? { target: target, prompt: msg.prompt || '' } : null;
             const sosHtml = msg.sos ? `
                 <div class="global-alert" style="margin-top:14px;">ゲーム中に、だれかからSOSが届きました（誰からかは分かりません）。<br>
                 次のお題は、ひとりずつ順番に話して全員の意見を聞いてみましょう。</div>` : '';
@@ -1920,7 +2088,7 @@
                 ${headlineHtml}${detailsHtml}
                 <div style="margin-top:12px;">${rankHtml}</div>
                 ${sosHtml}
-                <div class="info-tip" style="margin-top:14px; font-size:15px;"><b>トークタイム</b><br>「${escapeHtml(msg.prompt || '')}」<br>${first}時計回りに一言ずつ話してみよう。</div>
+                <div class="info-tip" style="margin-top:14px; font-size:15px;">${talkHtml}</div>
                 <button class="game-choice" onclick="closeGameOverlay()">会話にもどる</button>`);
             if (ranking[0] && ranking[0].name === myName && !msg.hideRanking) sfx('combo');
         }
@@ -1928,6 +2096,32 @@
         function closeGameOverlay() {
             stopLocalGame();
             gameEl('game-overlay').style.display = 'none';
+            if (pendingTalkNudge) showTalkNudge(pendingTalkNudge);
+            pendingTalkNudge = null;
+        }
+
+        // --- 「〇〇さんに話を振ってみよう」カード（話を振る相手の本人以外に表示） ---
+        //   60秒たつか、相手が少し話したら自動で消す
+        const TALK_NUDGE_SEC = 60, TALK_NUDGE_DONE_SPEAK_SEC = 3;
+        let pendingTalkNudge = null, talkNudge = null;
+        function showTalkNudge(n) {
+            hideTalkNudge();
+            const spoke = cumulativeStats[n.target] ? cumulativeStats[n.target].totalSpeakSeconds : 0;
+            talkNudge = { target: n.target, baseSpeak: spoke, timer: setTimeout(hideTalkNudge, TALK_NUDGE_SEC * 1000) };
+            document.getElementById('talk-nudge-title').innerText = `💬 ${withHonorific(n.target)}に話を振ってみよう`;
+            document.getElementById('talk-nudge-prompt').innerText = n.prompt ? `「${n.prompt}」と聞いてみるのはどう？` : '';
+            document.getElementById('talk-nudge').style.display = 'block';
+        }
+        function hideTalkNudge() {
+            if (talkNudge) clearTimeout(talkNudge.timer);
+            talkNudge = null;
+            const el = document.getElementById('talk-nudge');
+            if (el) el.style.display = 'none';
+        }
+        function checkTalkNudgeDone() {
+            if (!talkNudge) return;
+            const spoke = cumulativeStats[talkNudge.target] ? cumulativeStats[talkNudge.target].totalSpeakSeconds : 0;
+            if (spoke - talkNudge.baseSpeak >= TALK_NUDGE_DONE_SPEAK_SEC) hideTalkNudge();
         }
 
         function escapeHtml(str) {

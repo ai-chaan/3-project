@@ -12,6 +12,7 @@
 | `index.html` | メインアプリ（親機・子機兼用） |
 | `dashboard_for_ai_facilitator.html` | ファシリテーター向けリアルタイム会話分析ダッシュボード |
 | `server.js` | ローカル開発用の PeerJS シグナリングサーバー（ポート9000） |
+| `sw.js` | ゲーム開始の通知を出すための Service Worker |
 | `HANDOVER.md` | 詳細な仕様・通信プロトコル・引き継ぎメモ |
 
 ## ローカルで動かす
