@@ -2,6 +2,8 @@
 
 複数人での議論において、Webカメラとマイクから発話バランス・視線の向き・孤立状態を各端末のブラウザ上で判定し、AIが個別にアドバイスを表示するファシリテーション支援ツールです。映像・音声は送信せず、軽量なステータスのみを PeerJS（WebRTC）でP2P共有します。
 
+オプションの「AI話題サポート」をオンにすると、話せていない人がいるときに、文字起こしの流れから話を振る質問を Claude API で作ります（親機でAPIキーを入力。キーがなければ決まった質問から選ぶ簡易モード）。
+
 - 公開URL: https://ai-chaan.github.io/3-project/
 - 管理ダッシュボード: https://ai-chaan.github.io/3-project/dashboard_for_ai_facilitator.html
 
